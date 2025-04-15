@@ -1,5 +1,6 @@
 //https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
 const FONTSET_SIZE: usize = 80;
+const FONT_ADDR: u16 = 0x0;
 
 const FONTSET: [u8; FONTSET_SIZE] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -28,6 +29,7 @@ const NUM_REGS: usize = 16;
 const STACK_SIZE: usize = 16;
 const NUM_KEYS: usize = 16;
 const START_ADDR: u16 = 0x200;
+const TICK_RATE: u8 = 0;
 
 pub struct Oxid8 {
     pc: u16,                                      // Program Counter
@@ -40,6 +42,7 @@ pub struct Oxid8 {
     keys: [bool; NUM_KEYS],                       // Keys (0-F)
     dt: u8,                                       // Delay Timer
     st: u8,                                       // Sound Timer
+    tr: u8,                                       // Tick Rate
 }
 
 struct Opcode {}
@@ -63,12 +66,8 @@ impl Oxid8 {
             keys: [false; NUM_KEYS],
             dt: 0,
             st: 0,
+            tr: TICK_RATE,
         }
-    }
-
-    #[inline(always)]
-    fn load_font(&mut self) {
-        self.ram[0..FONTSET_SIZE].copy_from_slice(&FONTSET);
     }
 
     pub fn run(&mut self) {
@@ -100,7 +99,16 @@ impl Oxid8 {
         }
     }
 
-    pub fn push(&mut self, val: u16) {
+    fn tick_rate(&mut self, tr: u8) {
+        self.tr = tr;
+    }
+
+    #[inline(always)]
+    fn load_font(&mut self) {
+        self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)].copy_from_slice(&FONTSET);
+    }
+
+    fn push(&mut self, val: u16) {
         match self.sp as usize {
             0..STACK_SIZE => {
                 self.stack[self.sp as usize] = val;
@@ -111,7 +119,7 @@ impl Oxid8 {
     }
 
     // TODO: Think about if this should panic with an "underflow" or return None
-    pub fn pop(&mut self) -> Option<u16> {
+    fn pop(&mut self) -> Option<u16> {
         match self.sp as usize {
             1..=STACK_SIZE => {
                 self.sp -= 1;
@@ -152,6 +160,9 @@ mod tests {
     fn load_font() {
         let mut c8 = Oxid8::new();
         c8.load_font();
-        assert_eq!(c8.ram[0..FONTSET_SIZE], FONTSET);
+        assert_eq!(
+            c8.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)],
+            FONTSET
+        );
     }
 }
