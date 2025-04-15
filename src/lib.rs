@@ -1,5 +1,6 @@
 //https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
 const FONTSET_SIZE: usize = 80;
+
 const FONTSET: [u8; FONTSET_SIZE] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -28,7 +29,7 @@ const STACK_SIZE: usize = 16;
 const NUM_KEYS: usize = 16;
 const START_ADDR: u16 = 0x200;
 
-pub struct Chip8 {
+pub struct Oxid8 {
     pc: u16,                                      // Program Counter
     ram: [u8; RAM_SIZE],                          // RAM
     screen: [bool; SCREEN_WIDTH * SCREEN_HEIGHT], // Monochrome Display
@@ -49,9 +50,9 @@ struct Opcode {}
 // NOTE: use the left four columns of 1234 for the keypad
 // HACK: TRY TO RENDER IT IN THE TERMINAL!!!
 
-impl Chip8 {
-    pub fn new() -> Chip8 {
-        Chip8 {
+impl Oxid8 {
+    pub fn new() -> Oxid8 {
+        Oxid8 {
             pc: START_ADDR,
             ram: [0; RAM_SIZE],
             screen: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
@@ -65,7 +66,14 @@ impl Chip8 {
         }
     }
 
+    #[inline(always)]
+    fn load_font(&mut self) {
+        self.ram[0..FONTSET_SIZE].copy_from_slice(&FONTSET);
+    }
+
     pub fn run(&mut self) {
+        self.load_font();
+
         loop {
             // TODO: timing: 1-4MHz; 100 instructions per second is common
             // TODO: fetch
@@ -88,6 +96,7 @@ impl Chip8 {
             // TODO: execute
             //
             // execute the instruction
+            break;
         }
     }
 
@@ -120,7 +129,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn push_panic() {
-        let mut c8 = Chip8::new();
+        let mut c8 = Oxid8::new();
         for _ in 0..=STACK_SIZE {
             c8.push(1);
         }
@@ -128,14 +137,21 @@ mod tests {
 
     #[test]
     fn pop_some() {
-        let mut c8 = Chip8::new();
+        let mut c8 = Oxid8::new();
         c8.push(1);
         assert_eq!(c8.pop(), Some(1));
     }
 
     #[test]
     fn pop_none() {
-        let mut c8 = Chip8::new();
+        let mut c8 = Oxid8::new();
         assert_eq!(c8.pop(), None);
+    }
+
+    #[test]
+    fn load_font() {
+        let mut c8 = Oxid8::new();
+        c8.load_font();
+        assert_eq!(c8.ram[0..FONTSET_SIZE], FONTSET);
     }
 }
