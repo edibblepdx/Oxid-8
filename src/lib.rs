@@ -1,6 +1,4 @@
-use std::fs;
-use std::io::{self, BufReader, Read};
-use std::{fmt, fs::File, time::Instant};
+use std::{fmt, fs, io, time::Instant};
 
 //https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
 const FONTSET_SIZE: usize = 80;
@@ -35,8 +33,10 @@ const NUM_KEYS: usize = 16;
 const START_ADDR: u16 = 0x200;
 const TICK_RATE: u64 = 1 / 700; // 700 instructions per second
 
+#[derive(Debug)]
 struct Opcode(u8, u8, u8, u8);
 
+#[allow(dead_code)]
 impl Opcode {
     fn new(byte1: u8, byte2: u8) -> Opcode {
         Opcode(
@@ -45,6 +45,10 @@ impl Opcode {
             (byte2 & 0xF0) >> 4,
             byte2 & 0x0F,
         )
+    }
+
+    fn full(&self) -> u16 {
+        (self.0 as u16) << 12 | (self.1 as u16) << 8 | (self.2 as u16) << 4 | (self.3 as u16)
     }
 }
 
@@ -55,6 +59,7 @@ impl fmt::Display for Opcode {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct Oxid8 {
     pc: u16,                                      // Program Counter
     ram: [u8; RAM_SIZE],                          // RAM
@@ -75,6 +80,7 @@ pub struct Oxid8 {
 // NOTE: use the left four columns of 1234 for the keypad
 // HACK: TRY TO RENDER IT IN THE TERMINAL!!!
 
+#[allow(dead_code)]
 impl Oxid8 {
     pub fn new() -> Oxid8 {
         Oxid8 {
@@ -92,11 +98,9 @@ impl Oxid8 {
         }
     }
 
-    pub fn run(&mut self, filename: &str) {
+    pub fn run(&mut self, filename: &str) -> io::Result<()> {
         self.load_font();
-        if let Err(err) = self.load_rom(filename) {
-            panic!("ERROR::Failure to load ROM: {}", err);
-        }
+        self.load_rom(filename)?;
 
         // TODO: timing: 1-4MHz; 100 instructions per second is common
         //  a standard speed of around 700 CHIP-8 instructions per second
@@ -129,6 +133,8 @@ impl Oxid8 {
             while time.elapsed().as_secs() < self.tr {} // spin
             break; // WARN: Temporary (will be removed)
         }
+
+        Ok(())
     }
 
     pub fn tick_rate(&mut self, tr: u64) {
@@ -141,17 +147,6 @@ impl Oxid8 {
     }
 
     fn load_rom(&mut self, filename: &str) -> io::Result<()> {
-        /*
-        let f = File::open(name)?;
-        // WARN: Should I set a capacity? ROMS should never be large enough to go over,
-        // but I could have a case where part of a ROM is loaded which is an invalid state
-        let reader = BufReader::with_capacity(RAM_SIZE - START_ADDR as usize, f);
-
-        for (i, byte) in reader.bytes().enumerate() {
-            self.ram[START_ADDR as usize + i] = byte?;
-        }
-        */
-
         let rom: Vec<u8> = fs::read(filename)?;
         let len = rom.len();
         if len > (RAM_SIZE - START_ADDR as usize) {
@@ -207,6 +202,7 @@ mod tests {
         assert_eq!(opcode.1, 0x2);
         assert_eq!(opcode.2, 0x3);
         assert_eq!(opcode.3, 0x4);
+        assert_eq!(opcode.full(), 0x1234);
     }
 
     #[test]
