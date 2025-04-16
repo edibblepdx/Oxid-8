@@ -1,6 +1,10 @@
+use std::fs;
+use std::io::{self, BufReader, Read};
+use std::{fmt, fs::File, time::Instant};
+
 //https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
 const FONTSET_SIZE: usize = 80;
-const FONT_ADDR: u16 = 0x0;
+const FONT_ADDR: u16 = 0x050;
 
 const FONTSET: [u8; FONTSET_SIZE] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -29,8 +33,28 @@ const NUM_REGS: usize = 16;
 const STACK_SIZE: usize = 16;
 const NUM_KEYS: usize = 16;
 const START_ADDR: u16 = 0x200;
-const TICK_RATE: u8 = 0;
+const TICK_RATE: u64 = 1 / 700; // 700 instructions per second
 
+struct Opcode(u8, u8, u8, u8);
+
+impl Opcode {
+    fn new(byte1: u8, byte2: u8) -> Opcode {
+        Opcode(
+            (byte1 & 0xF0) >> 4,
+            byte1 & 0x0F,
+            (byte2 & 0xF0) >> 4,
+            byte2 & 0x0F,
+        )
+    }
+}
+
+impl fmt::Display for Opcode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {}, {}, {})", self.0, self.1, self.2, self.3)
+    }
+}
+
+#[allow(dead_code)]
 pub struct Oxid8 {
     pc: u16,                                      // Program Counter
     ram: [u8; RAM_SIZE],                          // RAM
@@ -42,13 +66,11 @@ pub struct Oxid8 {
     keys: [bool; NUM_KEYS],                       // Keys (0-F)
     dt: u8,                                       // Delay Timer
     st: u8,                                       // Sound Timer
-    tr: u8,                                       // Tick Rate
+    tr: u64,                                      // Tick Rate
 }
 
-struct Opcode {}
-
-// sprites are 8p wide and 1-15p tall
-// Sprite pixels are XOR'd with corresponding screen pixels.
+// NOTE: sprites are 8p wide and 1-15p tall
+// NOTE: Sprite pixels are XOR'd with corresponding screen pixels.
 // NOTE: use bell character for a beep \X07
 // NOTE: use the left four columns of 1234 for the keypad
 // HACK: TRY TO RENDER IT IN THE TERMINAL!!!
@@ -70,17 +92,23 @@ impl Oxid8 {
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, filename: &str) {
         self.load_font();
+        if let Err(err) = self.load_rom(filename) {
+            panic!("ERROR::Failure to load ROM: {}", err);
+        }
+
+        // TODO: timing: 1-4MHz; 100 instructions per second is common
+        //  a standard speed of around 700 CHIP-8 instructions per second
 
         loop {
-            // TODO: timing: 1-4MHz; 100 instructions per second is common
+            let time = Instant::now();
             // TODO: fetch
-            //
-            //  read two bytes
-            //  increment pc by 2
-            //
-            // TODO: decode (probably into an opcode struct)
+
+            let opcode = Opcode::new(self.ram[self.pc as usize], self.ram[self.pc as usize + 1]);
+            self.pc += 1;
+
+            // TODO: decode
             //
             //  match first half-byte (first hex number) [broad category]
             //  X second half byte looks up register V[0-F]
@@ -92,14 +120,18 @@ impl Oxid8 {
             //  NNN The second, third, fourth half-bytes:
             //      a 12-bit immediate memory address
             //
+            //let nn = opcode.2 ^ (opcode.3 << 2);
+            //
             // TODO: execute
             //
             // execute the instruction
-            break;
+            //
+            while time.elapsed().as_secs() < self.tr {} // spin
+            break; // WARN: Temporary (will be removed)
         }
     }
 
-    fn tick_rate(&mut self, tr: u8) {
+    pub fn tick_rate(&mut self, tr: u64) {
         self.tr = tr;
     }
 
@@ -108,24 +140,49 @@ impl Oxid8 {
         self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)].copy_from_slice(&FONTSET);
     }
 
+    fn load_rom(&mut self, filename: &str) -> io::Result<()> {
+        /*
+        let f = File::open(name)?;
+        // WARN: Should I set a capacity? ROMS should never be large enough to go over,
+        // but I could have a case where part of a ROM is loaded which is an invalid state
+        let reader = BufReader::with_capacity(RAM_SIZE - START_ADDR as usize, f);
+
+        for (i, byte) in reader.bytes().enumerate() {
+            self.ram[START_ADDR as usize + i] = byte?;
+        }
+        */
+
+        let rom: Vec<u8> = fs::read(filename)?;
+        let len = rom.len();
+        if len > (RAM_SIZE - START_ADDR as usize) {
+            return Err(io::Error::new(
+                io::ErrorKind::FileTooLarge,
+                format!("ROM too large: {}", len),
+            ));
+        }
+
+        self.ram[START_ADDR as usize..(START_ADDR as usize + len)].copy_from_slice(&rom);
+
+        Ok(())
+    }
+
     fn push(&mut self, val: u16) {
         match self.sp as usize {
             0..STACK_SIZE => {
                 self.stack[self.sp as usize] = val;
                 self.sp += 1;
             }
-            _ => panic!("Stack is full"),
+            _ => panic!("ERROR::Emulator Stack Overflow"),
         };
     }
 
-    // TODO: Think about if this should panic with an "underflow" or return None
-    fn pop(&mut self) -> Option<u16> {
+    fn pop(&mut self) -> u16 {
         match self.sp as usize {
             1..=STACK_SIZE => {
                 self.sp -= 1;
-                Some(self.stack[self.sp as usize])
+                self.stack[self.sp as usize]
             }
-            _ => None,
+            _ => panic!("ERROR::Emulator Stack Underflow"),
         }
     }
 }
@@ -133,6 +190,24 @@ impl Oxid8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test() {
+        // for misc testing
+        let a: [u8; 5] = [255, 155, 100, 55, 5];
+        let i: u16 = 0;
+        assert_eq!(255, a[i as usize]);
+        assert_eq!(155, a[i as usize + 1]);
+    }
+
+    #[test]
+    fn opcode_new() {
+        let opcode = Opcode::new(0x12, 0x34);
+        assert_eq!(opcode.0, 0x1);
+        assert_eq!(opcode.1, 0x2);
+        assert_eq!(opcode.2, 0x3);
+        assert_eq!(opcode.3, 0x4);
+    }
 
     #[test]
     #[should_panic]
@@ -144,16 +219,17 @@ mod tests {
     }
 
     #[test]
-    fn pop_some() {
+    fn pop() {
         let mut c8 = Oxid8::new();
         c8.push(1);
-        assert_eq!(c8.pop(), Some(1));
+        assert_eq!(c8.pop(), 1);
     }
 
     #[test]
-    fn pop_none() {
+    #[should_panic]
+    fn pop_panic() {
         let mut c8 = Oxid8::new();
-        assert_eq!(c8.pop(), None);
+        c8.pop();
     }
 
     #[test]
