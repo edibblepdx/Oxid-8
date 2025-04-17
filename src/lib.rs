@@ -1,6 +1,8 @@
 use std::{fmt, fs, io, time::Instant};
 
 //https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
+//http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#0.1
+
 const FONTSET_SIZE: usize = 80;
 const FONT_ADDR: u16 = 0x050;
 
@@ -47,8 +49,34 @@ impl Opcode {
         )
     }
 
+    /// A 16-bit value, the whole instruction.
     fn full(&self) -> u16 {
         (self.0 as u16) << 12 | (self.1 as u16) << 8 | (self.2 as u16) << 4 | (self.3 as u16)
+    }
+
+    /// A 12-bit value, the lowest 12 bits of the instruction.
+    fn nnn(&self) -> u16 {
+        (self.1 as u16) << 8 | (self.2 as u16) << 4 | (self.3 as u16)
+    }
+
+    /// A 4-bit value, the lowest 4 bits of the instruction.
+    fn n(&self) -> u8 {
+        self.3
+    }
+
+    /// A 4-bit value, the lower 4 bits of the high byte of the instruction.
+    fn x(&self) -> u8 {
+        self.1
+    }
+
+    /// A 4-bit value, the upper 4 bits of the low byte of the instruction.
+    fn y(&self) -> u8 {
+        self.2
+    }
+
+    /// An 8-bit value, the lowest 8 bits of the instruction.
+    fn kk(&self) -> u8 {
+        self.2 << 4 | self.3
     }
 }
 
@@ -110,7 +138,7 @@ impl Oxid8 {
             // TODO: fetch
 
             let opcode = Opcode::new(self.ram[self.pc as usize], self.ram[self.pc as usize + 1]);
-            self.pc += 1;
+            self.pc += 1; // WARN: is this +1 or +2???
 
             // TODO: decode
             //
@@ -124,12 +152,30 @@ impl Oxid8 {
             //  NNN The second, third, fourth half-bytes:
             //      a 12-bit immediate memory address
             //
-            //let nn = opcode.2 ^ (opcode.3 << 2);
-            //
             // TODO: execute
             //
             // execute the instruction
-            //
+
+            match opcode.0 {
+                0x0 => (),
+                0x1 => (),
+                0x2 => (),
+                0x3 => (),
+                0x4 => (),
+                0x5 => (),
+                0x6 => (),
+                0x7 => (),
+                0x8 => (),
+                0x9 => (),
+                0xA => (),
+                0xB => (),
+                0xC => (),
+                0xD => (),
+                0xE => (),
+                0xF => (),
+                _ => (), // unreachable
+            }
+
             while time.elapsed().as_secs() < self.tr {} // spin
             break; // WARN: Temporary (will be removed)
         }
@@ -141,7 +187,6 @@ impl Oxid8 {
         self.tr = tr;
     }
 
-    #[inline(always)]
     fn load_font(&mut self) {
         self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)].copy_from_slice(&FONTSET);
     }
@@ -180,7 +225,75 @@ impl Oxid8 {
             _ => panic!("ERROR::Emulator Stack Underflow"),
         }
     }
+
+    /// Clear the display.
+    fn cls(&mut self) {
+        self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
+    }
+
+    /// Return from a subroutine.
+    fn ret(&self) {}
+
+    /// Jump to location nnn.
+    fn jp(&mut self, nnn: u16) {
+        self.pc = nnn;
+    }
+
+    fn call(&self) {}
+
+    fn se(&self) {}
+
+    fn sne(&self) {}
+
+    /// Set Vx = kk.
+    fn ld(&mut self, x: usize, kk: u8) {
+        self.v_reg[x] = kk;
+    }
+
+    // NOTE: figure out naming!
+    fn ld_(&mut self, nnn: u16) {
+        self.i_reg = nnn;
+    }
+
+    /// Set Vx = Vx + kk.
+    fn add(&mut self, x: usize, kk: u8) {
+        self.v_reg[x] += kk;
+    }
+
+    fn or(&self) {}
+
+    fn xor(&self) {}
+
+    fn sub(&self) {}
+
+    fn shr(&self) {}
+
+    fn subn(&self) {}
+
+    fn shl(&self) {}
+
+    fn rnd(&self) {}
+
+    /// Display n-byte sprite starting at memory location I at (Vx, Vy),
+    /// set VF = collision.
+    fn drw(&self, x: usize, y: usize, n: u8) {
+        let (x, y) = (
+            self.v_reg[x] as usize % SCREEN_WIDTH,
+            self.v_reg[y] as usize % SCREEN_HEIGHT,
+        );
+    }
+
+    fn skp(&self) {}
 }
+
+/*
+    00E0 (clear screen)
+    1NNN (jump)
+    6XNN (set register VX)
+    7XNN (add value to register VX)
+    ANNN (set index register I)
+    DXYN (display/draw)
+*/
 
 #[cfg(test)]
 mod tests {
@@ -202,7 +315,17 @@ mod tests {
         assert_eq!(opcode.1, 0x2);
         assert_eq!(opcode.2, 0x3);
         assert_eq!(opcode.3, 0x4);
+    }
+
+    #[test]
+    fn opcode_decode() {
+        let opcode = Opcode::new(0x12, 0x34);
         assert_eq!(opcode.full(), 0x1234);
+        assert_eq!(opcode.nnn(), 0x234);
+        assert_eq!(opcode.n(), 0x4);
+        assert_eq!(opcode.x(), 0x2);
+        assert_eq!(opcode.y(), 0x3);
+        assert_eq!(opcode.kk(), 0x34);
     }
 
     #[test]
