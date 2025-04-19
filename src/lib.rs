@@ -1,3 +1,5 @@
+mod renderer;
+
 use std::{fmt, fs, io, time::Instant};
 
 //https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
@@ -37,6 +39,22 @@ const TICK_RATE: u64 = 1 / 700; // 700 instructions per second
 
 #[derive(Debug)]
 struct Opcode(u8, u8, u8, u8);
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct Oxid8 {
+    pc: u16,                                      // Program Counter
+    ram: [u8; RAM_SIZE],                          // RAM
+    screen: [bool; SCREEN_WIDTH * SCREEN_HEIGHT], // Monochrome Display
+    v_reg: [u8; NUM_REGS],                        // 8-bit V Registers
+    i_reg: u16,                                   // 16[12]-bit I Register
+    sp: u16,                                      // Stack Pointer
+    stack: [u16; STACK_SIZE],                     // Stack
+    keys: [bool; NUM_KEYS],                       // Keys (0-F)
+    dt: u8,                                       // Delay Timer
+    st: u8,                                       // Sound Timer
+    tr: u64,                                      // Tick Rate
+}
 
 #[allow(dead_code)]
 impl Opcode {
@@ -84,22 +102,6 @@ impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}, {}, {}, {})", self.0, self.1, self.2, self.3)
     }
-}
-
-#[allow(dead_code)]
-#[derive(Debug)]
-pub struct Oxid8 {
-    pc: u16,                                      // Program Counter
-    ram: [u8; RAM_SIZE],                          // RAM
-    screen: [bool; SCREEN_WIDTH * SCREEN_HEIGHT], // Monochrome Display
-    v_reg: [u8; NUM_REGS],                        // 8-bit V Registers
-    i_reg: u16,                                   // 16[12]-bit I Register
-    sp: u16,                                      // Stack Pointer
-    stack: [u16; STACK_SIZE],                     // Stack
-    keys: [bool; NUM_KEYS],                       // Keys (0-F)
-    dt: u8,                                       // Delay Timer
-    st: u8,                                       // Sound Timer
-    tr: u64,                                      // Tick Rate
 }
 
 // NOTE: sprites are 8p wide and 1-15p tall
@@ -225,7 +227,11 @@ impl Oxid8 {
             _ => panic!("ERROR::Emulator Stack Underflow"),
         }
     }
+}
 
+/// Oxid8 CPU Instructions
+#[allow(dead_code)]
+impl Oxid8 {
     /// Clear the display.
     fn cls(&mut self) {
         self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];

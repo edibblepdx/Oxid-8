@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+crossterm = "0.29.0"
+indoc = "2.0.6"
 ratatui = "0.29.0"
 wgpu = "25.0.0"
