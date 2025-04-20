@@ -1,5 +1,6 @@
 mod renderer;
 
+use rand::{Rng, rng, rngs::ThreadRng};
 use std::{fmt, fs, io, time::Instant};
 
 //https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
@@ -54,6 +55,7 @@ pub struct Oxid8 {
     dt: u8,                                       // Delay Timer
     st: u8,                                       // Sound Timer
     tr: u64,                                      // Tick Rate
+    rng: ThreadRng,
 }
 
 #[allow(dead_code)]
@@ -125,9 +127,11 @@ impl Oxid8 {
             dt: 0,
             st: 0,
             tr: TICK_RATE,
+            rng: rng(),
         }
     }
 
+    // WARN: might be a good idea to move self here
     pub fn run(&mut self, filename: &str) -> io::Result<()> {
         self.load_font();
         self.load_rom(filename)?;
@@ -229,58 +233,135 @@ impl Oxid8 {
     }
 }
 
+/*
+    00E0 (clear screen)                     done
+    1NNN (jump)                             done
+    6XNN (set register VX)                  done
+    7XNN (add value to register VX)         done
+    ANNN (set index register I)
+    DXYN (display/draw)
+*/
+
 /// Oxid8 CPU Instructions
+///
+/// Naming Conventions:
+/// n:      half-byte
+/// kk:     byte
+/// nnn:    address
+/// x,y,i:  register
 #[allow(dead_code)]
 impl Oxid8 {
-    /// Clear the display.
+    /// 00E0 - Clear the display.
     fn cls(&mut self) {
         self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
     }
 
-    /// Return from a subroutine.
-    fn ret(&self) {}
+    /// 00EE - Return from a subroutine.
+    fn ret(&self) {
+        todo!()
+    }
 
-    /// Jump to location nnn.
-    fn jp(&mut self, nnn: u16) {
+    /// 1nnn - Jump to location nnn.
+    fn jp_nnn(&mut self, nnn: u16) {
         self.pc = nnn;
     }
 
-    fn call(&self) {}
+    /// 2nnn - Call subroutine at nnn.
+    fn call_nnn(&self) {
+        todo!()
+    }
 
-    fn se(&self) {}
+    /// 3xkk - Skip next instruction if Vx = kk.
+    fn se_xkk(&self) {
+        todo!()
+    }
 
-    fn sne(&self) {}
+    /// 4xkk - Skip next instruction if Vx != kk.
+    fn sne_xkk(&self) {
+        todo!()
+    }
 
-    /// Set Vx = kk.
-    fn ld(&mut self, x: usize, kk: u8) {
+    /// 5xy0 - Skip next instruction if Vx = Vy.
+    fn se_xy(&self) {
+        todo!()
+    }
+
+    /// 6xkk - Set Vx = kk.
+    fn ld_xkk(&mut self, x: usize, kk: u8) {
         self.v_reg[x] = kk;
     }
 
-    // NOTE: figure out naming!
-    fn ld_(&mut self, nnn: u16) {
-        self.i_reg = nnn;
-    }
-
-    /// Set Vx = Vx + kk.
-    fn add(&mut self, x: usize, kk: u8) {
+    /// 7xkk - Set Vx = Vx + kk.
+    fn add_xkk(&mut self, x: usize, kk: u8) {
         self.v_reg[x] += kk;
     }
 
-    fn or(&self) {}
+    /// 8xy0 - Set Vx = Vy.
+    fn ld_xy(&mut self, x: usize, y: usize) {
+        self.v_reg[x] = self.v_reg[y];
+    }
 
-    fn xor(&self) {}
+    /// 8xy1 - Set Vx = Vx OR Vy.
+    fn or(&mut self, x: usize, y: usize) {
+        self.v_reg[x] = self.v_reg[x] | self.v_reg[y];
+    }
 
-    fn sub(&self) {}
+    /// 8xy2 - Set Vx = Vx AND Vy.
+    fn and(&mut self, x: usize, y: usize) {
+        self.v_reg[x] = self.v_reg[x] & self.v_reg[y];
+    }
 
-    fn shr(&self) {}
+    /// 8xy3 - Set Vx = Vx XOR Vy.
+    fn xor(&mut self, x: usize, y: usize) {
+        self.v_reg[x] = self.v_reg[x] ^ self.v_reg[y];
+    }
 
-    fn subn(&self) {}
+    /// 8xy4 - Set Vx = Vx + Vy, set VF = carry.
+    fn add_xy(&self, x: usize, y: usize) {
+        todo!()
+    }
 
-    fn shl(&self) {}
+    /// 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow.
+    fn sub_xy(&self, x: usize, y: usize) {
+        todo!()
+    }
 
-    fn rnd(&self) {}
+    /// 8xy6 - Set Vx = Vx SHR 1.
+    fn shr(&self, x: usize, _y: usize) {
+        todo!()
+    }
 
-    /// Display n-byte sprite starting at memory location I at (Vx, Vy),
+    /// 8xy7 - Set Vx = Vy - Vx, set VF = NOT borrow.
+    fn subn_xy(&self) {
+        todo!()
+    }
+
+    /// 8xyE - Set Vx = Vx SHL 1.
+    fn shl(&self, x: usize, _y: usize) {
+        todo!()
+    }
+
+    /// 9xy0 - Skip next instruction if Vx != Vy.
+    fn sne_xy(&self) {
+        todo!()
+    }
+
+    /// Annn - Set I = nnn.
+    fn ld_innn(&mut self, nnn: u16) {
+        self.i_reg = nnn;
+    }
+
+    /// Jump to location nnn + V0.
+    fn jp_0nnn(&mut self, nnn: u16) {
+        self.pc = nnn + self.v_reg[0] as u16;
+    }
+
+    /// Cxkk - Set Vx = random byte AND kk.
+    fn rnd(&mut self, x: usize, kk: u8) {
+        self.v_reg[x] = self.rng.random_range(0..=255) as u8 & kk;
+    }
+
+    /// Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
     /// set VF = collision.
     fn drw(&self, x: usize, y: usize, n: u8) {
         let (x, y) = (
@@ -289,17 +370,16 @@ impl Oxid8 {
         );
     }
 
-    fn skp(&self) {}
-}
+    /// Ex9E Skip next instruction if key with the value of Vx is pressed.
+    fn skp(&self) {
+        todo!()
+    }
 
-/*
-    00E0 (clear screen)
-    1NNN (jump)
-    6XNN (set register VX)
-    7XNN (add value to register VX)
-    ANNN (set index register I)
-    DXYN (display/draw)
-*/
+    /// Skip next instruction if key with the value of Vx is not pressed.
+    fn sknp(&self) {
+        todo!()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -367,3 +447,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod test_cpu_instructions {}
