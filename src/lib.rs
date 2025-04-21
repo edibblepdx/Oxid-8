@@ -142,45 +142,51 @@ impl Oxid8 {
 
         loop {
             let time = Instant::now();
-            // TODO: fetch
 
+            // Fetch and Decode
+            // ----------------
             let opcode = Opcode::new(self.ram[self.pc as usize], self.ram[self.pc as usize + 1]);
             self.pc += 1; // WARN: is this +1 or +2???
 
-            // TODO: decode
-            //
-            //  match first half-byte (first hex number) [broad category]
-            //  X second half byte looks up register V[0-F]
-            //  Y third half byte looks up register V[0-F]
-            //  N fourth half byte: 4-bit number
-            //
-            //  NN The second byte (3rd & 4th half-bytes):
-            //      an 8 bit immediate number
-            //  NNN The second, third, fourth half-bytes:
-            //      a 12-bit immediate memory address
-            //
-            // TODO: execute
-            //
-            // execute the instruction
+            macro_rules! invalid {
+                () => {
+                    panic!("Invalid Instruction: {:04X}", opcode.full())
+                };
+            }
 
+            /*
+                00E0 (clear screen)                     done
+                1NNN (jump)                             done
+                6XNN (set register VX)                  done
+                7XNN (add value to register VX)         done
+                ANNN (set index register I)             done
+                DXYN (display/draw)
+            */
+
+            // Execute
+            // -------
             match opcode.0 {
-                0x0 => (),
-                0x1 => (),
-                0x2 => (),
-                0x3 => (),
-                0x4 => (),
-                0x5 => (),
-                0x6 => (),
-                0x7 => (),
-                0x8 => (),
-                0x9 => (),
-                0xA => (),
-                0xB => (),
-                0xC => (),
-                0xD => (),
-                0xE => (),
-                0xF => (),
-                _ => (), // unreachable
+                0x0 => match opcode.kk() {
+                    0xE0 => self.cls(),
+                    0xEE => self.ret(),
+                    _ => invalid!(),
+                },
+                0x1 => self.jp_nnn(opcode.nnn()),
+                0x2 => self.call(opcode.nnn()),
+                0x3 => self.se_xkk(opcode.x() as usize, opcode.kk()),
+                0x4 => self.sne_xkk(opcode.x() as usize, opcode.kk()),
+                0x5 => self.se_xy(opcode.x() as usize, opcode.y() as usize),
+                0x6 => self.ld_xkk(opcode.x() as usize, opcode.kk()),
+                0x7 => self.add_xkk(opcode.x() as usize, opcode.kk()),
+                0x8 => todo!(),
+                0x9 => todo!(),
+                0xA => self.ld_innn(opcode.nnn()),
+                0xB => todo!(),
+                0xC => todo!(),
+                0xD => self.drw(opcode.x() as usize, opcode.y() as usize, opcode.n()),
+                0xE => todo!(),
+                0xF => todo!(),
+                _ => invalid!(),
             }
 
             while time.elapsed().as_secs() < self.tr {} // spin
@@ -234,15 +240,6 @@ impl Oxid8 {
     }
 }
 
-/*
-    00E0 (clear screen)                     done
-    1NNN (jump)                             done
-    6XNN (set register VX)                  done
-    7XNN (add value to register VX)         done
-    ANNN (set index register I)             done
-    DXYN (display/draw)
-*/
-
 /// Oxid8 CPU Instructions
 #[allow(dead_code)]
 impl Oxid8 {
@@ -273,7 +270,7 @@ impl Oxid8 {
     }
 
     /// 2nnn - Call subroutine at nnn.
-    fn call_nnn(&mut self, nnn: u16) {
+    fn call(&mut self, nnn: u16) {
         self.sp += 1;
         self.push(self.pc);
         self.pc = nnn;
