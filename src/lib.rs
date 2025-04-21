@@ -35,6 +35,7 @@ const RAM_SIZE: usize = 4096;
 const NUM_REGS: usize = 16;
 const STACK_SIZE: usize = 16;
 const NUM_KEYS: usize = 16;
+const VF: usize = 15;
 const START_ADDR: u16 = 0x200;
 const TICK_RATE: u64 = 1 / 700; // 700 instructions per second
 
@@ -55,7 +56,7 @@ pub struct Oxid8 {
     dt: u8,                                       // Delay Timer
     st: u8,                                       // Sound Timer
     tr: u64,                                      // Tick Rate
-    rng: ThreadRng,
+    rng: ThreadRng,                               // RNG
 }
 
 #[allow(dead_code)]
@@ -238,7 +239,7 @@ impl Oxid8 {
     1NNN (jump)                             done
     6XNN (set register VX)                  done
     7XNN (add value to register VX)         done
-    ANNN (set index register I)
+    ANNN (set index register I)             done
     DXYN (display/draw)
 */
 
@@ -260,8 +261,8 @@ impl Oxid8 {
     }
 
     /// 00EE - Return from a subroutine.
-    fn ret(&self) {
-        todo!()
+    fn ret(&mut self) {
+        self.pc = self.pop();
     }
 
     /// 1nnn - Jump to location nnn.
@@ -270,23 +271,31 @@ impl Oxid8 {
     }
 
     /// 2nnn - Call subroutine at nnn.
-    fn call_nnn(&self) {
-        todo!()
+    fn call_nnn(&mut self, nnn: u16) {
+        self.sp += 1;
+        self.push(self.pc);
+        self.pc = nnn;
     }
 
     /// 3xkk - Skip next instruction if Vx = kk.
-    fn se_xkk(&self) {
-        todo!()
+    fn se_xkk(&mut self, x: usize, kk: u8) {
+        if self.v_reg[x] == kk {
+            self.pc += 2; // WARN: validate if it should be 1 or 2
+        }
     }
 
     /// 4xkk - Skip next instruction if Vx != kk.
-    fn sne_xkk(&self) {
-        todo!()
+    fn sne_xkk(&mut self, x: usize, kk: u8) {
+        if self.v_reg[x] != kk {
+            self.pc += 2; // WARN: validate if it should be 1 or 2
+        }
     }
 
     /// 5xy0 - Skip next instruction if Vx = Vy.
-    fn se_xy(&self) {
-        todo!()
+    fn se_xy(&mut self, x: usize, y: usize) {
+        if self.v_reg[x] == self.v_reg[y] {
+            self.pc += 2; // WARN: validate if it should be 1 or 2
+        }
     }
 
     /// 6xkk - Set Vx = kk.
@@ -320,33 +329,45 @@ impl Oxid8 {
     }
 
     /// 8xy4 - Set Vx = Vx + Vy, set VF = carry.
-    fn add_xy(&self, x: usize, y: usize) {
-        todo!()
+    fn add_xy(&mut self, x: usize, y: usize) {
+        let sum = self.v_reg[x] as u16 + self.v_reg[y] as u16;
+        self.v_reg[VF] = if sum > 0xFF { 1 } else { 0 };
+        self.v_reg[x] = sum as u8;
     }
 
     /// 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow.
-    fn sub_xy(&self, x: usize, y: usize) {
-        todo!()
+    fn sub_xy(&mut self, x: usize, y: usize) {
+        let (vx, vy) = (self.v_reg[x], self.v_reg[y]);
+        self.v_reg[VF] = if vx > vy { 1 } else { 0 };
+        self.v_reg[x] = vx - vy;
     }
 
     /// 8xy6 - Set Vx = Vx SHR 1.
-    fn shr(&self, x: usize, _y: usize) {
-        todo!()
+    fn shr(&mut self, x: usize, _y: usize) {
+        let vx = self.v_reg[x];
+        self.v_reg[VF] = vx & 1;
+        self.v_reg[x] = vx >> 1;
     }
 
     /// 8xy7 - Set Vx = Vy - Vx, set VF = NOT borrow.
-    fn subn_xy(&self) {
-        todo!()
+    fn subn_xy(&mut self, x: usize, y: usize) {
+        let (vx, vy) = (self.v_reg[x], self.v_reg[y]);
+        self.v_reg[VF] = if vx > vy { 1 } else { 0 };
+        self.v_reg[x] = vy - vx;
     }
 
     /// 8xyE - Set Vx = Vx SHL 1.
-    fn shl(&self, x: usize, _y: usize) {
-        todo!()
+    fn shl(&mut self, x: usize, _y: usize) {
+        let vx = self.v_reg[x];
+        self.v_reg[VF] = (vx >> 7) & 1;
+        self.v_reg[x] = vx << 1;
     }
 
     /// 9xy0 - Skip next instruction if Vx != Vy.
-    fn sne_xy(&self) {
-        todo!()
+    fn sne_xy(&mut self, x: usize, y: usize) {
+        if self.v_reg[x] != self.v_reg[y] {
+            self.pc += 2; // WARN: validate if it should be 1 or 2
+        }
     }
 
     /// Annn - Set I = nnn.
@@ -366,6 +387,7 @@ impl Oxid8 {
 
     /// Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
     /// set VF = collision.
+    // TODO: FINISH draw then test with IBM logo (and write some generic tests)
     fn drw(&self, x: usize, y: usize, n: u8) {
         let (x, y) = (
             self.v_reg[x] as usize % SCREEN_WIDTH,
