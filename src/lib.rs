@@ -244,17 +244,19 @@ impl Oxid8 {
 */
 
 /// Oxid8 CPU Instructions
-///
-/// Naming Conventions:
-/// n:      half-byte
-/// kk:     byte
-/// nnn:    address
-/// x,y,i:  register
-/// dt:     delay timer
-/// st:     sound timer
-/// k:      key
 #[allow(dead_code)]
 impl Oxid8 {
+    /// Naming Conventions:
+    /// -------------------
+    /// n:      half-byte
+    /// kk:     byte
+    /// nnn:    address
+    /// x,y,i:  register
+    /// dt:     delay timer
+    /// st:     sound timer
+    /// k:      key
+    /// -------------------
+
     /// 00E0 - Clear the display.
     fn cls(&mut self) {
         self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
@@ -388,11 +390,40 @@ impl Oxid8 {
     /// Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
     /// set VF = collision.
     // TODO: FINISH draw then test with IBM logo (and write some generic tests)
-    fn drw(&self, x: usize, y: usize, n: u8) {
+    fn drw(&mut self, x: usize, y: usize, n: u8) {
+        // a sprite is a byte wide and n in [1,15] rows where n is an integer
         let (x, y) = (
-            self.v_reg[x] as usize % SCREEN_WIDTH,
-            self.v_reg[y] as usize % SCREEN_HEIGHT,
+            self.v_reg[x] as usize % SCREEN_WIDTH,  // wrap
+            self.v_reg[y] as usize % SCREEN_HEIGHT, // wrap
         );
+        self.v_reg[VF] = 0; // turn off collision flag
+        let start_pixel: usize = (y * SCREEN_WIDTH) + x;
+        let start_addr: usize = self.i_reg as usize;
+
+        // draw n bytes to the screen
+        for i in 0..n as usize {
+            if y + i >= SCREEN_HEIGHT {
+                break; // clip
+            }
+            let pixel_posn: usize = start_pixel + (SCREEN_WIDTH * i);
+            let sprite_row: u8 = self.ram[start_addr + i];
+
+            // for each bit
+            for j in 0..8 {
+                if x + j >= SCREEN_WIDTH {
+                    break; // clip
+                }
+                let ref mut pixel_ref = self.screen[pixel_posn + j];
+                let old_pixel = *pixel_ref;
+
+                let sprite_pixel = (sprite_row >> (0x7 - j)) & 0x1;
+                *pixel_ref ^= sprite_pixel != 0;
+
+                if !(*pixel_ref) && old_pixel {
+                    self.v_reg[VF] = 1; // turn on collision flag
+                }
+            }
+        }
     }
 
     /// Ex9E - Skip next instruction if key with the value of Vx is pressed.
