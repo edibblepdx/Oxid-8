@@ -249,6 +249,9 @@ impl Oxid8 {
 /// kk:     byte
 /// nnn:    address
 /// x,y,i:  register
+/// dt:     delay timer
+/// st:     sound timer
+/// k:      key
 #[allow(dead_code)]
 impl Oxid8 {
     /// 00E0 - Clear the display.
@@ -351,7 +354,7 @@ impl Oxid8 {
         self.i_reg = nnn;
     }
 
-    /// Jump to location nnn + V0.
+    /// Bnnn - Jump to location nnn + V0.
     fn jp_0nnn(&mut self, nnn: u16) {
         self.pc = nnn + self.v_reg[0] as u16;
     }
@@ -370,13 +373,59 @@ impl Oxid8 {
         );
     }
 
-    /// Ex9E Skip next instruction if key with the value of Vx is pressed.
+    /// Ex9E - Skip next instruction if key with the value of Vx is pressed.
     fn skp(&self) {
         todo!()
     }
 
-    /// Skip next instruction if key with the value of Vx is not pressed.
+    /// ExA1 - Skip next instruction if key with the value of Vx is not pressed.
     fn sknp(&self) {
+        todo!()
+    }
+
+    /// Fx07 - Set Vx = delay timer value.
+    fn ld_xdt(&self) {
+        todo!()
+    }
+
+    /// Fx0A - Wait for a key press, store the value of the key in Vx.
+    fn ld_xk(&self) {
+        todo!()
+    }
+
+    /// Fx15 - Set delay timer = Vx.
+    fn ld_dtx(&self) {
+        todo!()
+    }
+
+    /// Fx18 - Set Vx = delay timer value.
+    fn ld_stx(&self) {
+        todo!()
+    }
+
+    /// Fx1E - Set I = I + Vx.
+    fn add_ix(&self) {
+        todo!()
+    }
+
+    /// Fx29 - Set I = location of sprite for digit Vx.
+    fn ld_fx(&self) {
+        todo!()
+    }
+
+    /// Fx33 - Store BCD representation of Vx in memory locations I, I+1,
+    /// and I+2.
+    fn ld_bx(&self) {
+        todo!()
+    }
+
+    /// Fx55 - Store registers V0 through Vx in memory starting at location I.
+    fn ld_store_ix(&self) {
+        todo!()
+    }
+
+    /// Read registers V0 through Vx from memory starting at location I.
+    fn ld_read_xi(&self) {
         todo!()
     }
 }
