@@ -4,10 +4,7 @@ use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
     layout::{Constraint, Flex, Layout, Rect},
-    style::{
-        Color, Modifier, Style, Stylize,
-        palette::tailwind::{BLUE, GREEN, SLATE},
-    },
+    style::{Color, Modifier, Style, Stylize, palette::tailwind::SLATE},
     symbols::border,
     text::{Line, Text},
     widgets::{

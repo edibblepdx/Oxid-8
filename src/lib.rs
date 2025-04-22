@@ -132,8 +132,7 @@ impl Oxid8 {
         }
     }
 
-    // WARN: might be a good idea to move self here
-    pub fn run(&mut self, filename: &str) -> io::Result<()> {
+    pub fn run(mut self /* move */, filename: &str) -> io::Result<()> {
         self.load_font();
         self.load_rom(filename)?;
 
@@ -184,6 +183,9 @@ impl Oxid8 {
                 0xB => todo!(),
                 0xC => todo!(),
                 0xD => self.drw(opcode.x() as usize, opcode.y() as usize, opcode.n()),
+                // NOTE: maybe draw two rows per character because terminal characters are tall ▄ ▀ █
+                // or draw two columns per pixel ██ 128 is pretty wide though (probably easier to
+                // do though)
                 0xE => todo!(),
                 0xF => todo!(),
                 _ => invalid!(),
@@ -516,36 +518,79 @@ mod tests {
     #[test]
     #[should_panic]
     fn push_panic() {
-        let mut c8 = Oxid8::new();
+        let mut emu = Oxid8::new();
         for _ in 0..=STACK_SIZE {
-            c8.push(1);
+            emu.push(1);
         }
     }
 
     #[test]
     fn pop() {
-        let mut c8 = Oxid8::new();
-        c8.push(1);
-        assert_eq!(c8.pop(), 1);
+        let mut emu = Oxid8::new();
+        emu.push(1);
+        assert_eq!(emu.pop(), 1);
     }
 
     #[test]
     #[should_panic]
     fn pop_panic() {
-        let mut c8 = Oxid8::new();
-        c8.pop();
+        let mut emu = Oxid8::new();
+        emu.pop();
     }
 
     #[test]
     fn load_font() {
-        let mut c8 = Oxid8::new();
-        c8.load_font();
+        let mut emu = Oxid8::new();
+        emu.load_font();
         assert_eq!(
-            c8.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)],
+            emu.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)],
             FONTSET
         );
     }
-}
 
-#[cfg(test)]
-mod test_cpu_instructions {}
+    #[test]
+    fn draw_basic() {
+        // just two x on top of each other 8x15
+        let sprite = [
+            0x81, 0x42, 0x24, 0x18, //
+            0x18, 0x24, 0x42, 0x81, //
+            0x42, 0x24, 0x18, 0x18, //
+            0x24, 0x42, 0x81, //
+        ];
+
+        let screen = [
+            true, false, false, false, false, false, false, true, // 1
+            false, true, false, false, false, false, true, false, // 2
+            false, false, true, false, false, true, false, false, // 3
+            false, false, false, true, true, false, false, false, // 4
+            false, false, false, true, true, false, false, false, // 5
+            false, false, true, false, false, true, false, false, // 6
+            false, true, false, false, false, false, true, false, // 7
+            true, false, false, false, false, false, false, true, // 8
+            false, true, false, false, false, false, true, false, // 9
+            false, false, true, false, false, true, false, false, // 10
+            false, false, false, true, true, false, false, false, // 11
+            false, false, false, true, true, false, false, false, // 12
+            false, false, true, false, false, true, false, false, // 13
+            false, true, false, false, false, false, true, false, // 14
+            true, false, false, false, false, false, false, true, // 15
+        ];
+
+        let mut emu = Oxid8::new();
+
+        emu.i_reg = START_ADDR;
+        let start = START_ADDR as usize;
+
+        emu.ram[start..start + sprite.len()].copy_from_slice(&sprite);
+        emu.drw(0, 0, sprite.len() as u8);
+
+        for i in 0..15 {
+            let offset1: usize = i * SCREEN_WIDTH;
+            let offset2: usize = i * 8;
+            assert_eq!(
+                emu.screen[offset1 + 0..offset1 + 8],
+                screen[offset2 + 0..offset2 + 8]
+            );
+        }
+    }
+}
