@@ -144,7 +144,10 @@ impl Oxid8 {
 
             // Fetch and Decode
             // ----------------
-            let opcode = Opcode::new(self.ram[self.pc as usize], self.ram[self.pc as usize + 1]);
+            let opcode = Opcode::new(
+                self.ram[self.pc as usize],     //
+                self.ram[self.pc as usize + 1], //
+            );
             self.pc += 1; // WARN: is this +1 or +2???
 
             macro_rules! invalid {
@@ -152,15 +155,6 @@ impl Oxid8 {
                     panic!("Invalid Instruction: {:04X}", opcode.full())
                 };
             }
-
-            /*
-                00E0 (clear screen)                     done
-                1NNN (jump)                             done
-                6XNN (set register VX)                  done
-                7XNN (add value to register VX)         done
-                ANNN (set index register I)             done
-                DXYN (display/draw)
-            */
 
             // Execute
             // -------
@@ -182,10 +176,19 @@ impl Oxid8 {
                 0xA => self.ld_innn(opcode.nnn()),
                 0xB => todo!(),
                 0xC => todo!(),
-                0xD => self.drw(opcode.x() as usize, opcode.y() as usize, opcode.n()),
+                0xD => {
+                    // WARN: finish me
+                    self.drw(
+                        opcode.x() as usize, //
+                        opcode.y() as usize, //
+                        opcode.n(),          //
+                    );
+                    // send frame to renderer
+                    renderer(&self.screen);
+                }
                 // NOTE: maybe draw two rows per character because terminal characters are tall ▄ ▀ █
                 // or draw two columns per pixel ██ 128 is pretty wide though (probably easier to
-                // do though)
+                // do)
                 0xE => todo!(),
                 0xF => todo!(),
                 _ => invalid!(),
@@ -203,7 +206,8 @@ impl Oxid8 {
     }
 
     fn load_font(&mut self) {
-        self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)].copy_from_slice(&FONTSET);
+        self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)] //
+            .copy_from_slice(&FONTSET);
     }
 
     fn load_rom(&mut self, filename: &str) -> io::Result<()> {
@@ -216,7 +220,8 @@ impl Oxid8 {
             ));
         }
 
-        self.ram[START_ADDR as usize..(START_ADDR as usize + len)].copy_from_slice(&rom);
+        self.ram[START_ADDR as usize..(START_ADDR as usize + len)] //
+            .copy_from_slice(&rom);
 
         Ok(())
     }
