@@ -1,6 +1,9 @@
 use oxid8::app::App;
 use oxid8::core::Oxid8;
-use std::{io, time::Instant};
+use std::{
+    io::{self, Write, stdout},
+    time::Instant,
+};
 
 const TICK_RATE: u64 = 1 / 700; // 700 instructions per second
 
@@ -11,6 +14,9 @@ const TICK_RATE: u64 = 1 / 700; // 700 instructions per second
 // or draw two columns per pixel ██ 128 is pretty wide though (probably easier to do)
 
 fn main() -> io::Result<()> {
+    print!("\x07");
+    stdout().flush()?;
+
     let mut emu = Oxid8::new();
     if let Err(err) = emu.load_rom("abc") {
         eprintln!("{err}");
