@@ -1,2 +1,2 @@
 pub mod app;
-pub mod oxidate;
+pub mod core;

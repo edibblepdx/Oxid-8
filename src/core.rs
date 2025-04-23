@@ -35,7 +35,6 @@ const STACK_SIZE: usize = 16;
 const NUM_KEYS: usize = 16;
 const VF: usize = 15;
 const START_ADDR: u16 = 0x200;
-const TICK_RATE: u64 = 1 / 700; // NOTE: 700 instructions per second
 
 #[derive(Debug)]
 struct Opcode(u8, u8, u8, u8);
@@ -104,12 +103,6 @@ impl fmt::Display for Opcode {
     }
 }
 
-// NOTE: sprites are 8p wide and 1-15p tall
-// NOTE: Sprite pixels are XOR'd with corresponding screen pixels.
-// NOTE: use bell character for a beep \X07
-// NOTE: use the left four columns of 1234 for the keypad
-// HACK: TRY TO RENDER IT IN THE TERMINAL!!!
-
 /// Oxid8 Core
 #[allow(dead_code)]
 impl Oxid8 {
@@ -129,7 +122,7 @@ impl Oxid8 {
         }
     }
 
-    pub fn run_cycle(&mut self) -> io::Result<()> {
+    pub fn run_cycle(&mut self) -> Result<(), String> {
         // TODO: fix return type
         let opcode = Opcode::new(
             self.ram[self.pc as usize],     //
@@ -139,7 +132,9 @@ impl Oxid8 {
 
         macro_rules! invalid {
             () => {
-                panic!("Invalid Instruction: {:04X}", opcode.full())
+                // NOTE: this returning a result but push pop panicking doesn't seem like consistent
+                // behavior
+                return Err(format!("Invalid Instruction: {:04X}", opcode.full()))
             };
         }
 
@@ -168,9 +163,6 @@ impl Oxid8 {
                     opcode.n(),          //
                 );
             }
-            // NOTE: maybe draw two rows per character because terminal characters are tall ▄ ▀ █
-            // or draw two columns per pixel ██ 128 is pretty wide though (probably easier to
-            // do)
             0xE => todo!(),
             0xF => todo!(),
             _ => invalid!(),
@@ -179,12 +171,12 @@ impl Oxid8 {
         Ok(())
     }
 
-    fn load_font(&mut self) {
+    pub fn load_font(&mut self) {
         self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)] //
             .copy_from_slice(&FONTSET);
     }
 
-    fn load_rom(&mut self, filename: &str) -> io::Result<()> {
+    pub fn load_rom(&mut self, filename: &str) -> io::Result<()> {
         let rom: Vec<u8> = fs::read(filename)?;
         let len = rom.len();
         if len > (RAM_SIZE - START_ADDR as usize) {
