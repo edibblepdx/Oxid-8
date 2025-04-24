@@ -170,20 +170,19 @@ impl Oxid8 {
                 _ => invalid!(),
             },
             0xF => match opcode.kk() {
-                0x07 => todo!(),
-                0x0A => todo!(),
-                0x15 => todo!(),
-                0x18 => todo!(),
-                0x1E => todo!(),
-                0x29 => todo!(),
-                0x33 => todo!(),
-                0x55 => todo!(),
-                0x65 => todo!(),
+                0x07 => self.ld_xdt(),
+                0x0A => self.ld_xk(),
+                0x15 => self.ld_dtx(),
+                0x18 => self.ld_stx(),
+                0x1E => self.add_ix(),
+                0x29 => self.ld_fx(),
+                0x33 => self.ld_bx(),
+                0x55 => self.ld_store_ix(),
+                0x65 => self.ld_read_xi(),
                 _ => invalid!(),
             },
             _ => invalid!(),
         }
-
         Ok(())
     }
 
@@ -196,6 +195,8 @@ impl Oxid8 {
             .copy_from_slice(&FONTSET);
     }
 
+    // TODO: remove reading the file from the emu, only have it read the
+    // resulting slice
     pub fn load_rom(&mut self, filename: &str) -> io::Result<()> {
         let rom: Vec<u8> = fs::read(filename)?;
         let len = rom.len();
@@ -486,7 +487,7 @@ impl Oxid8 {
         todo!()
     }
 
-    /// Read registers V0 through Vx from memory starting at location I.
+    /// Fx65 - Read registers V0 through Vx from memory starting at location I.
     fn ld_read_xi(&self) {
         todo!()
     }
