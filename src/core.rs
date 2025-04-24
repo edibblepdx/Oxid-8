@@ -116,7 +116,7 @@ impl Oxid8 {
             self.ram[self.pc as usize],     //
             self.ram[self.pc as usize + 1], //
         );
-        self.pc += 1; // WARN: is this +1 or +2???
+        self.pc += 2; // WARN: is this +1 or +2???
 
         macro_rules! invalid {
             () => {
@@ -139,11 +139,22 @@ impl Oxid8 {
             0x5 => self.se_xy(opcode.x() as usize, opcode.y() as usize),
             0x6 => self.ld_xkk(opcode.x() as usize, opcode.kk()),
             0x7 => self.add_xkk(opcode.x() as usize, opcode.kk()),
-            0x8 => todo!(),
-            0x9 => todo!(),
+            0x8 => match opcode.n() {
+                0x0 => self.ld_xy(opcode.x() as usize, opcode.y() as usize),
+                0x1 => self.or(opcode.x() as usize, opcode.y() as usize),
+                0x2 => self.and(opcode.x() as usize, opcode.y() as usize),
+                0x3 => self.xor(opcode.x() as usize, opcode.y() as usize),
+                0x4 => self.add_xy(opcode.x() as usize, opcode.y() as usize),
+                0x5 => self.sub_xy(opcode.x() as usize, opcode.y() as usize),
+                0x6 => self.shr(opcode.x() as usize, opcode.y() as usize),
+                0x7 => self.subn_xy(opcode.x() as usize, opcode.y() as usize),
+                0xE => self.shl(opcode.x() as usize, opcode.y() as usize),
+                _ => invalid!(),
+            },
+            0x9 => self.sne_xy(opcode.x() as usize, opcode.y() as usize),
             0xA => self.ld_innn(opcode.nnn()),
-            0xB => todo!(),
-            0xC => todo!(),
+            0xB => self.jp_0nnn(opcode.nnn()),
+            0xC => self.rnd(opcode.x() as usize, opcode.kk()),
             0xD => {
                 self.drw(
                     opcode.x() as usize, //
@@ -151,8 +162,23 @@ impl Oxid8 {
                     opcode.n(),          //
                 );
             }
-            0xE => todo!(),
-            0xF => todo!(),
+            0xE => match opcode.kk() {
+                0x9E => self.skp(),
+                0xA1 => self.sknp(),
+                _ => invalid!(),
+            },
+            0xF => match opcode.kk() {
+                0x07 => todo!(),
+                0x0A => todo!(),
+                0x15 => todo!(),
+                0x18 => todo!(),
+                0x1E => todo!(),
+                0x29 => todo!(),
+                0x33 => todo!(),
+                0x55 => todo!(),
+                0x65 => todo!(),
+                _ => invalid!(),
+            },
             _ => invalid!(),
         }
 
@@ -179,7 +205,7 @@ impl Oxid8 {
         }
 
         self.ram[START_ADDR as usize..(START_ADDR as usize + len)] //
-            .copy_from_slice(&rom);
+            .copy_from_slice(rom.as_slice());
 
         Ok(())
     }
