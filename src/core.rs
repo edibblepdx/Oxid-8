@@ -1,9 +1,8 @@
 use rand::{Rng, rng, rngs::ThreadRng};
 use std::{fmt, fs, io};
 
-//https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
-//http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#0.1
-
+// Source for font and constants:
+// https://aquova.net/emudev/chip8/
 const FONTSET_SIZE: usize = 80;
 const FONT_ADDR: u16 = 0x050;
 
@@ -39,6 +38,9 @@ const START_ADDR: u16 = 0x200;
 #[derive(Debug)]
 struct Opcode(u8, u8, u8, u8);
 
+// struct Oxid8 source modified:
+// https://aquova.net/emudev/chip8/
+// All methods are original
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct Oxid8 {
@@ -250,6 +252,7 @@ impl Default for Oxid8 {
 }
 
 /// Oxid8 CPU Instructions
+/// Source: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#0.1
 #[allow(dead_code)]
 impl Oxid8 {
     /// Naming Conventions:
