@@ -57,8 +57,8 @@ pub struct Oxid8 {
 
 #[allow(dead_code)]
 impl Opcode {
-    fn new(byte1: u8, byte2: u8) -> Opcode {
-        Opcode(
+    fn new(byte1: u8, byte2: u8) -> Self {
+        Self(
             (byte1 & 0xF0) >> 4,
             byte1 & 0x0F,
             (byte2 & 0xF0) >> 4,
@@ -106,20 +106,8 @@ impl fmt::Display for Opcode {
 /// Oxid8 Core
 #[allow(dead_code)]
 impl Oxid8 {
-    pub fn new() -> Oxid8 {
-        Oxid8 {
-            pc: START_ADDR,
-            ram: [0; RAM_SIZE],
-            screen: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
-            v_reg: [0; NUM_REGS],
-            i_reg: 0,
-            sp: 0,
-            stack: [0; STACK_SIZE],
-            keys: [false; NUM_KEYS],
-            dt: 0,
-            st: 0,
-            rng: rng(),
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn run_cycle(&mut self) -> Result<(), String> {
@@ -171,6 +159,10 @@ impl Oxid8 {
         Ok(())
     }
 
+    pub fn screen_ref(&self) -> &[bool] {
+        &self.screen
+    }
+
     pub fn load_font(&mut self) {
         self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)] //
             .copy_from_slice(&FONTSET);
@@ -209,6 +201,24 @@ impl Oxid8 {
                 self.stack[self.sp as usize]
             }
             _ => panic!("ERROR::Emulator Stack Underflow"),
+        }
+    }
+}
+
+impl Default for Oxid8 {
+    fn default() -> Self {
+        Self {
+            pc: START_ADDR,
+            ram: [0; RAM_SIZE],
+            screen: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
+            v_reg: [0; NUM_REGS],
+            i_reg: 0,
+            sp: 0,
+            stack: [0; STACK_SIZE],
+            keys: [false; NUM_KEYS],
+            dt: 0,
+            st: 0,
+            rng: rng(),
         }
     }
 }
