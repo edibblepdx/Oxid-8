@@ -112,13 +112,13 @@ impl Oxid8 {
         Self::default()
     }
 
-    pub fn run_cycle(&mut self) -> Result<(), String> {
+    pub fn run_cycle(&mut self, key: Option<u8>) -> Result<(), String> {
         // TODO: fix return type
         let opcode = Opcode::new(
             self.ram[self.pc as usize],     //
             self.ram[self.pc as usize + 1], //
         );
-        self.pc += 2; // WARN: is this +1 or +2???
+        self.pc += 2;
 
         macro_rules! invalid {
             () => {
@@ -165,20 +165,20 @@ impl Oxid8 {
                 );
             }
             0xE => match opcode.kk() {
-                0x9E => self.skp(),
-                0xA1 => self.sknp(),
+                0x9E => self.skp(opcode.x() as usize, key),
+                0xA1 => self.sknp(opcode.x() as usize, key),
                 _ => invalid!(),
             },
             0xF => match opcode.kk() {
-                0x07 => self.ld_xdt(),
-                0x0A => self.ld_xk(),
-                0x15 => self.ld_dtx(),
-                0x18 => self.ld_stx(),
-                0x1E => self.add_ix(),
-                0x29 => self.ld_fx(),
-                0x33 => self.ld_bx(),
-                0x55 => self.ld_store_ix(),
-                0x65 => self.ld_read_xi(),
+                0x07 => self.ld_xdt(opcode.x() as usize),
+                0x0A => self.ld_xk(opcode.x() as usize, key),
+                0x15 => self.ld_dtx(opcode.x() as usize),
+                0x18 => self.ld_stx(opcode.x() as usize),
+                0x1E => self.add_ix(opcode.x() as usize),
+                0x29 => self.ld_fx(opcode.x() as usize),
+                0x33 => self.ld_bx(opcode.x() as usize),
+                0x55 => self.ld_ix(opcode.x() as usize),
+                0x65 => self.ld_xi(opcode.x() as usize),
                 _ => invalid!(),
             },
             _ => invalid!(),
@@ -292,21 +292,21 @@ impl Oxid8 {
     /// 3xkk - Skip next instruction if Vx = kk.
     fn se_xkk(&mut self, x: usize, kk: u8) {
         if self.v_reg[x] == kk {
-            self.pc += 2; // WARN: validate if it should be 1 or 2
+            self.pc += 2;
         }
     }
 
     /// 4xkk - Skip next instruction if Vx != kk.
     fn sne_xkk(&mut self, x: usize, kk: u8) {
         if self.v_reg[x] != kk {
-            self.pc += 2; // WARN: validate if it should be 1 or 2
+            self.pc += 2;
         }
     }
 
     /// 5xy0 - Skip next instruction if Vx = Vy.
     fn se_xy(&mut self, x: usize, y: usize) {
         if self.v_reg[x] == self.v_reg[y] {
-            self.pc += 2; // WARN: validate if it should be 1 or 2
+            self.pc += 2;
         }
     }
 
@@ -378,7 +378,7 @@ impl Oxid8 {
     /// 9xy0 - Skip next instruction if Vx != Vy.
     fn sne_xy(&mut self, x: usize, y: usize) {
         if self.v_reg[x] != self.v_reg[y] {
-            self.pc += 2; // WARN: validate if it should be 1 or 2
+            self.pc += 2;
         }
     }
 
@@ -399,7 +399,6 @@ impl Oxid8 {
 
     /// Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
     /// set VF = collision.
-    // TODO: FINISH draw then test with IBM logo (and write some generic tests)
     fn drw(&mut self, x: usize, y: usize, n: u8) {
         // a sprite is a byte wide and n in [1,15] rows where n is an integer
         let (x, y) = (
@@ -437,59 +436,80 @@ impl Oxid8 {
     }
 
     /// Ex9E - Skip next instruction if key with the value of Vx is pressed.
-    fn skp(&self) {
-        todo!()
+    fn skp(&mut self, x: usize, key: Option<u8>) {
+        if let Some(k) = key {
+            if k == self.v_reg[x] {
+                self.pc += 2;
+            }
+        }
     }
 
     /// ExA1 - Skip next instruction if key with the value of Vx is not pressed.
-    fn sknp(&self) {
-        todo!()
+    fn sknp(&mut self, x: usize, key: Option<u8>) {
+        if let Some(k) = key {
+            if k != self.v_reg[x] {
+                self.pc += 2;
+            }
+        }
     }
 
     /// Fx07 - Set Vx = delay timer value.
-    fn ld_xdt(&self) {
-        todo!()
+    fn ld_xdt(&mut self, x: usize) {
+        self.v_reg[x] = self.dt;
     }
 
     /// Fx0A - Wait for a key press, store the value of the key in Vx.
-    fn ld_xk(&self) {
-        todo!()
+    fn ld_xk(&mut self, x: usize, key: Option<u8>) {
+        if let Some(k) = key {
+            self.v_reg[x] = k;
+        } else {
+            // set pc to previous state
+            self.pc -= 2;
+        }
     }
 
     /// Fx15 - Set delay timer = Vx.
-    fn ld_dtx(&self) {
-        todo!()
+    fn ld_dtx(&mut self, x: usize) {
+        self.dt = self.v_reg[x];
     }
 
-    /// Fx18 - Set Vx = delay timer value.
-    fn ld_stx(&self) {
-        todo!()
+    /// Fx18 - Set sound timer = Vx.
+    fn ld_stx(&mut self, x: usize) {
+        self.st = self.v_reg[x];
     }
 
     /// Fx1E - Set I = I + Vx.
-    fn add_ix(&self) {
-        todo!()
+    fn add_ix(&mut self, x: usize) {
+        self.i_reg += self.v_reg[x] as u16;
     }
 
     /// Fx29 - Set I = location of sprite for digit Vx.
-    fn ld_fx(&self) {
-        todo!()
+    fn ld_fx(&mut self, x: usize) {
+        // WARN: not sure about this one
+        self.i_reg = FONT_ADDR + (self.v_reg[x] as u16 * 5);
     }
 
-    /// Fx33 - Store BCD representation of Vx in memory locations I, I+1,
-    /// and I+2.
-    fn ld_bx(&self) {
-        todo!()
+    /// Fx33 - Store BCD representation of Vx in memory locations I, I+1, and I+2.
+    fn ld_bx(&mut self, x: usize) {
+        let i = self.i_reg as usize;
+        let v = self.v_reg[x];
+        self.ram[i] = (v / 100) % 10;
+        self.ram[i + 1] = (v / 10) % 10;
+        self.ram[i + 2] = v % 10;
     }
 
     /// Fx55 - Store registers V0 through Vx in memory starting at location I.
-    fn ld_store_ix(&self) {
-        todo!()
+    fn ld_ix(&mut self, x: usize) {
+        for i in 0..=x {
+            self.ram[self.i_reg as usize + i] = self.v_reg[i];
+        }
     }
 
     /// Fx65 - Read registers V0 through Vx from memory starting at location I.
-    fn ld_read_xi(&self) {
-        todo!()
+    fn ld_xi(&mut self, x: usize) {
+        for i in 0..=x {
+            self.v_reg[i] = self.ram[self.i_reg as usize + i];
+        }
     }
 }
 

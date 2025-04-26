@@ -48,7 +48,7 @@ fn main() -> io::Result<()> {
             }
         }
 
-        if let Err(err) = emu.core.run_cycle() {
+        if let Err(err) = emu.core.run_cycle(None) {
             eprintln!("{err}");
         }
 

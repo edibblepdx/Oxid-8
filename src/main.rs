@@ -32,7 +32,7 @@ fn main() -> io::Result<()> {
 
         // poll events (key press mainly)
         // run cycle
-        if let Err(err) = emu.run_cycle() {
+        if let Err(err) = emu.run_cycle(None) {
             eprintln!("{err}");
         }
         // check draw flag
