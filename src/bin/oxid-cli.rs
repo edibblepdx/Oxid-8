@@ -6,8 +6,7 @@ use ratatui::{
     widgets::canvas::{Canvas, Painter, Shape},
 };
 use std::{
-    env,
-    io::{self, Write, stdout},
+    env, io, process,
     time::{Duration, Instant},
 };
 
@@ -24,9 +23,40 @@ struct EmuState {
     should_exit: bool,
 }
 
-fn main() -> io::Result<()> {
+pub struct Config {
+    pub rom_path: String,
+}
+
+impl Config {
+    pub fn build(args: &[String]) -> Result<Config, &'static str> {
+        if args.len() >= 2 {
+            Ok(Config {
+                rom_path: args[1].clone(),
+            })
+        } else if let Ok(val) = env::var("OXID_ROM") {
+            Ok(Config { rom_path: val })
+        } else {
+            Err("not enough arguments")
+        }
+    }
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let config = Config::build(&args).unwrap_or_else(|err| {
+        eprintln!("Problem parsing arguments: {err}");
+        process::exit(1);
+    });
+
+    if let Err(e) = run(config) {
+        eprintln!("Application error: {e}");
+        process::exit(1);
+    }
+}
+
+fn run(config: Config) -> io::Result<()> {
     let mut emu = Emu::default();
-    if let Err(err) = emu.core.load_rom("../oxid-8/c8games/IBMLOGO") {
+    if let Err(err) = emu.core.load_rom(&config.rom_path) {
         eprintln!("{err}");
     }
     emu.core.load_font();
