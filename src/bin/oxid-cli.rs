@@ -56,9 +56,7 @@ fn main() {
 
 fn run(config: Config) -> io::Result<()> {
     let mut emu = Emu::default();
-    if let Err(err) = emu.core.load_rom(&config.rom_path) {
-        eprintln!("{err}");
-    }
+    emu.core.load_rom(&config.rom_path)?;
     emu.core.load_font();
 
     let mut terminal = ratatui::init();
@@ -71,7 +69,6 @@ fn run(config: Config) -> io::Result<()> {
     while !emu.state.should_exit {
         let time = Instant::now();
 
-        // TODO: poll events (key press mainly)
         if event::poll(Duration::from_millis(1))? {
             if let Err(err) = handle_events(&mut emu.state) {
                 eprintln!("{err}");
@@ -82,7 +79,6 @@ fn run(config: Config) -> io::Result<()> {
             eprintln!("{err}");
         }
 
-        // TODO: check draw flag
         let _ = terminal.draw(|frame| {
             let area = frame.area();
 
