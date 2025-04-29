@@ -128,6 +128,8 @@ impl Oxid8 {
             };
         }
 
+        eprintln!("{:04x}", opcode.full());
+
         match opcode.0 {
             0x0 => match opcode.kk() {
                 0xE0 => self.cls(),
@@ -275,6 +277,7 @@ impl Oxid8 {
     /// 00EE - Return from a subroutine.
     fn ret(&mut self) {
         self.pc = self.pop();
+        self.sp -= 1;
     }
 
     /// 1nnn - Jump to location nnn.
