@@ -218,8 +218,8 @@ impl Oxid8 {
     fn push(&mut self, val: u16) {
         match self.sp as usize {
             0..STACK_SIZE => {
-                self.stack[self.sp as usize] = val;
                 self.sp += 1;
+                self.stack[self.sp as usize] = val;
             }
             _ => panic!("ERROR::Emulator Stack Overflow"),
         };
@@ -228,8 +228,9 @@ impl Oxid8 {
     fn pop(&mut self) -> u16 {
         match self.sp as usize {
             1..=STACK_SIZE => {
+                let val = self.stack[self.sp as usize];
                 self.sp -= 1;
-                self.stack[self.sp as usize]
+                val
             }
             _ => panic!("ERROR::Emulator Stack Underflow"),
         }
@@ -277,7 +278,6 @@ impl Oxid8 {
     /// 00EE - Return from a subroutine.
     fn ret(&mut self) {
         self.pc = self.pop();
-        self.sp -= 1;
     }
 
     /// 1nnn - Jump to location nnn.
@@ -287,7 +287,6 @@ impl Oxid8 {
 
     /// 2nnn - Call subroutine at nnn.
     fn call(&mut self, nnn: u16) {
-        self.sp += 1;
         self.push(self.pc);
         self.pc = nnn;
     }
@@ -330,31 +329,31 @@ impl Oxid8 {
 
     /// 8xy1 - Set Vx = Vx OR Vy.
     fn or(&mut self, x: usize, y: usize) {
-        self.v_reg[x] = self.v_reg[x] | self.v_reg[y];
+        self.v_reg[x] |= self.v_reg[y];
     }
 
     /// 8xy2 - Set Vx = Vx AND Vy.
     fn and(&mut self, x: usize, y: usize) {
-        self.v_reg[x] = self.v_reg[x] & self.v_reg[y];
+        self.v_reg[x] &= self.v_reg[y];
     }
 
     /// 8xy3 - Set Vx = Vx XOR Vy.
     fn xor(&mut self, x: usize, y: usize) {
-        self.v_reg[x] = self.v_reg[x] ^ self.v_reg[y];
+        self.v_reg[x] ^= self.v_reg[y];
     }
 
     /// 8xy4 - Set Vx = Vx + Vy, set VF = carry.
     fn add_xy(&mut self, x: usize, y: usize) {
-        let sum = self.v_reg[x] as u16 + self.v_reg[y] as u16;
-        self.v_reg[VF] = if sum > 0xFF { 1 } else { 0 };
-        self.v_reg[x] = sum as u8;
+        let (vx, carry) = self.v_reg[x].overflowing_add(self.v_reg[y]);
+        self.v_reg[VF] = if carry { 1 } else { 0 };
+        self.v_reg[x] = vx;
     }
 
     /// 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow.
     fn sub_xy(&mut self, x: usize, y: usize) {
-        let (vx, vy) = (self.v_reg[x], self.v_reg[y]);
-        self.v_reg[VF] = if vx > vy { 1 } else { 0 };
-        self.v_reg[x] = vx - vy;
+        let (vx, borrow) = self.v_reg[x].overflowing_sub(self.v_reg[y]);
+        self.v_reg[VF] = if borrow { 0 } else { 1 };
+        self.v_reg[x] = vx;
     }
 
     /// 8xy6 - Set Vx = Vx SHR 1.
