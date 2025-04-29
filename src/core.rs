@@ -345,14 +345,14 @@ impl Oxid8 {
     /// 8xy4 - Set Vx = Vx + Vy, set VF = carry.
     fn add_xy(&mut self, x: usize, y: usize) {
         let (vx, carry) = self.v_reg[x].overflowing_add(self.v_reg[y]);
-        self.v_reg[VF] = if carry { 1 } else { 0 };
+        self.v_reg[VF] = carry as u8;
         self.v_reg[x] = vx;
     }
 
     /// 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow.
     fn sub_xy(&mut self, x: usize, y: usize) {
         let (vx, borrow) = self.v_reg[x].overflowing_sub(self.v_reg[y]);
-        self.v_reg[VF] = if borrow { 0 } else { 1 };
+        self.v_reg[VF] = !borrow as u8;
         self.v_reg[x] = vx;
     }
 
@@ -365,9 +365,9 @@ impl Oxid8 {
 
     /// 8xy7 - Set Vx = Vy - Vx, set VF = NOT borrow.
     fn subn_xy(&mut self, x: usize, y: usize) {
-        let (vx, vy) = (self.v_reg[x], self.v_reg[y]);
-        self.v_reg[VF] = if vx > vy { 1 } else { 0 };
-        self.v_reg[x] = vy - vx;
+        let (vx, borrow) = self.v_reg[y].overflowing_sub(self.v_reg[x]);
+        self.v_reg[VF] = !borrow as u8;
+        self.v_reg[x] = vx;
     }
 
     /// 8xyE - Set Vx = Vx SHL 1.
