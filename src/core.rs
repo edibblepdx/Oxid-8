@@ -317,7 +317,7 @@ impl Oxid8 {
 
     /// 7xkk - Set Vx = Vx + kk.
     fn add_xkk(&mut self, x: usize, kk: u8) {
-        self.v_reg[x] += kk;
+        self.v_reg[x] = self.v_reg[x].wrapping_add(kk);
     }
 
     /// 8xy0 - Set Vx = Vy.
