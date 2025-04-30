@@ -3,7 +3,10 @@ use oxid8::core::{Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH};
 use ratatui::{
     style::Color,
     symbols::Marker,
-    widgets::canvas::{Canvas, Painter, Shape},
+    widgets::{
+        Block,
+        canvas::{Canvas, Painter, Shape},
+    },
 };
 use std::{
     env, io, process,
@@ -62,9 +65,9 @@ fn run(config: Config) -> io::Result<()> {
     let mut terminal = ratatui::init();
     terminal.clear()?;
 
-    let size = terminal.size()?;
-    let width = size.width as f64;
-    let height = size.width as f64;
+    //let size = terminal.size()?;
+    //let width = size.width as f64;
+    //let height = size.width as f64;
 
     while !emu.state.should_exit {
         let time = Instant::now();
@@ -86,11 +89,13 @@ fn run(config: Config) -> io::Result<()> {
 
         let _ = terminal.draw(|frame| {
             let area = frame.area();
+            eprintln!("{}", area);
 
             frame.render_widget(
                 Canvas::default()
-                    .x_bounds([-width / 2.0, width / 2.0])
-                    .y_bounds([-height / 2.0, height / 2.0])
+                    .block(Block::bordered().title("game"))
+                    .x_bounds([0.0, SCREEN_WIDTH as f64])
+                    .y_bounds([0.0, SCREEN_HEIGHT as f64])
                     .marker(Marker::HalfBlock)
                     .paint(|ctx| {
                         ctx.draw(&emu);
@@ -149,9 +154,27 @@ impl Shape for Emu {
         for y in 0..SCREEN_HEIGHT {
             for x in 0..SCREEN_WIDTH {
                 if screen_ref[x + y * SCREEN_WIDTH] {
-                    painter.paint(x, y, Color::White)
+                    painter.paint(x, y, Color::White);
                 }
             }
         }
     }
+
+    /*********************************************************************
+     * This scales to terminal size but it looks pretty bad in my opinion
+     *********************************************************************
+    fn draw(&self, painter: &mut Painter) {
+        let screen_ref = self.core.screen_ref();
+        for y in 0..SCREEN_HEIGHT {
+            for x in 0..SCREEN_WIDTH {
+                if screen_ref[x + y * SCREEN_WIDTH] {
+                    let y = SCREEN_HEIGHT - 1 - y;
+                    if let Some((x, y)) = painter.get_point(x as f64, y as f64) {
+                        painter.paint(x, y, Color::White);
+                    }
+                }
+            }
+        }
+    }
+    */
 }
