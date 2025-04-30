@@ -73,9 +73,11 @@ fn run(config: Config) -> io::Result<()> {
         };
 
         // WARN: testing things
+        /*
         if let Some(k) = key {
             eprintln!("{}", k);
         }
+        */
 
         if let Err(err) = emu.core.run_cycle(key) {
             eprintln!("{err}");
@@ -121,21 +123,27 @@ fn handle_key_event(key_event: KeyEvent, emu_state: &mut EmuState) -> Option<u8>
             emu_state.should_exit = true;
             None
         }
-        KeyCode::Char('1') => Some(0x0),
-        KeyCode::Char('2') => Some(0x1),
-        KeyCode::Char('3') => Some(0x2),
-        KeyCode::Char('4') => Some(0x3),
+        /*
+         * 1 2 3 C
+         * 4 5 6 D
+         * 7 8 9 E
+         * A 0 B f
+         */
+        KeyCode::Char('1') => Some(0x1),
+        KeyCode::Char('2') => Some(0x2),
+        KeyCode::Char('3') => Some(0x3),
+        KeyCode::Char('4') => Some(0xC),
         KeyCode::Char('q') => Some(0x4),
         KeyCode::Char('w') => Some(0x5),
         KeyCode::Char('e') => Some(0x6),
-        KeyCode::Char('r') => Some(0x7),
-        KeyCode::Char('a') => Some(0x8),
-        KeyCode::Char('s') => Some(0x9),
-        KeyCode::Char('d') => Some(0xA),
-        KeyCode::Char('f') => Some(0xB),
-        KeyCode::Char('z') => Some(0xC),
-        KeyCode::Char('x') => Some(0xD),
-        KeyCode::Char('c') => Some(0xE),
+        KeyCode::Char('r') => Some(0xD),
+        KeyCode::Char('a') => Some(0x7),
+        KeyCode::Char('s') => Some(0x8),
+        KeyCode::Char('d') => Some(0x9),
+        KeyCode::Char('f') => Some(0xE),
+        KeyCode::Char('z') => Some(0xA),
+        KeyCode::Char('x') => Some(0x0),
+        KeyCode::Char('c') => Some(0xB),
         KeyCode::Char('v') => Some(0xF),
         _ => None,
     }
