@@ -3,10 +3,7 @@ use oxid8::core::{Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH};
 use ratatui::{
     style::Color,
     symbols::Marker,
-    widgets::{
-        Block,
-        canvas::{Canvas, Painter, Shape},
-    },
+    widgets::canvas::{Canvas, Painter, Shape},
 };
 use std::{
     env, io, process,
@@ -24,6 +21,7 @@ struct Emu {
 #[derive(Default)]
 struct EmuState {
     should_exit: bool,
+    area: ratatui::layout::Rect,
 }
 
 pub struct Config {
@@ -65,10 +63,6 @@ fn run(config: Config) -> io::Result<()> {
     let mut terminal = ratatui::init();
     terminal.clear()?;
 
-    //let size = terminal.size()?;
-    //let width = size.width as f64;
-    //let height = size.width as f64;
-
     while !emu.state.should_exit {
         let time = Instant::now();
 
@@ -89,11 +83,10 @@ fn run(config: Config) -> io::Result<()> {
 
         let _ = terminal.draw(|frame| {
             let area = frame.area();
-            eprintln!("{}", area);
+            emu.state.area = area;
 
             frame.render_widget(
                 Canvas::default()
-                    .block(Block::bordered().title("game"))
                     .x_bounds([0.0, SCREEN_WIDTH as f64])
                     .y_bounds([0.0, SCREEN_HEIGHT as f64])
                     .marker(Marker::HalfBlock)
@@ -153,7 +146,11 @@ impl Shape for Emu {
         let screen_ref = self.core.screen_ref();
         for y in 0..SCREEN_HEIGHT {
             for x in 0..SCREEN_WIDTH {
-                if screen_ref[x + y * SCREEN_WIDTH] {
+                if screen_ref[x + y * SCREEN_WIDTH]
+                    && x < self.state.area.width as usize
+                    && y < (self.state.area.height * 2) as usize
+                // WARN: ONLY for rendering half-blocks
+                {
                     painter.paint(x, y, Color::White);
                 }
             }
