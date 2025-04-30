@@ -124,7 +124,11 @@ impl Oxid8 {
             () => {
                 // NOTE: this returning a result but push pop panicking doesn't seem like consistent
                 // behavior
-                return Err(format!("Invalid Instruction: {:04X}", opcode.full()))
+                return Err(format!(
+                    "Invalid Instruction: {:04X} at {}",
+                    opcode.full(),
+                    self.pc,
+                ))
             };
         }
 
@@ -219,8 +223,8 @@ impl Oxid8 {
     fn push(&mut self, val: u16) {
         match self.sp as usize {
             0..STACK_SIZE => {
-                self.sp += 1;
                 self.stack[self.sp as usize] = val;
+                self.sp += 1;
             }
             _ => panic!("ERROR::Emulator Stack Overflow"),
         };
@@ -229,9 +233,8 @@ impl Oxid8 {
     fn pop(&mut self) -> u16 {
         match self.sp as usize {
             1..=STACK_SIZE => {
-                let val = self.stack[self.sp as usize];
                 self.sp -= 1;
-                val
+                self.stack[self.sp as usize]
             }
             _ => panic!("ERROR::Emulator Stack Underflow"),
         }
