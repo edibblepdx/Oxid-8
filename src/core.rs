@@ -397,7 +397,7 @@ impl Oxid8 {
 
     /// Cxkk - Set Vx = random byte AND kk.
     fn rnd(&mut self, x: usize, kk: u8) {
-        self.v_reg[x] = self.rng.random_range(0..=255) as u8 & kk;
+        self.v_reg[x] = self.rng.random_range(0..=0xFF) as u8 & kk;
     }
 
     /// Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
@@ -449,7 +449,11 @@ impl Oxid8 {
 
     /// ExA1 - Skip next instruction if key with the value of Vx is not pressed.
     fn sknp(&mut self, x: usize, key: Option<u8>) {
-        if let Some(k) = key {
+        if key == None {
+            // No key pressed in general
+            self.pc += 2;
+        } else if let Some(k) = key {
+            // Some key press
             if k != self.v_reg[x] {
                 self.pc += 2;
             }
