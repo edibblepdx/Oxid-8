@@ -349,36 +349,36 @@ impl Oxid8 {
     /// 8xy4 - Set Vx = Vx + Vy, set VF = carry.
     fn add_xy(&mut self, x: usize, y: usize) {
         let (vx, carry) = self.v_reg[x].overflowing_add(self.v_reg[y]);
-        self.v_reg[VF] = carry as u8;
         self.v_reg[x] = vx;
+        self.v_reg[VF] = carry as u8;
     }
 
     /// 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow.
     fn sub_xy(&mut self, x: usize, y: usize) {
         let (vx, borrow) = self.v_reg[x].overflowing_sub(self.v_reg[y]);
-        self.v_reg[VF] = !borrow as u8;
         self.v_reg[x] = vx;
+        self.v_reg[VF] = !borrow as u8;
     }
 
     /// 8xy6 - Set Vx = Vx SHR 1.
     fn shr(&mut self, x: usize, _y: usize) {
         let vx = self.v_reg[x];
-        self.v_reg[VF] = vx & 1;
         self.v_reg[x] = vx >> 1;
+        self.v_reg[VF] = vx & 1;
     }
 
     /// 8xy7 - Set Vx = Vy - Vx, set VF = NOT borrow.
     fn subn_xy(&mut self, x: usize, y: usize) {
         let (vx, borrow) = self.v_reg[y].overflowing_sub(self.v_reg[x]);
-        self.v_reg[VF] = !borrow as u8;
         self.v_reg[x] = vx;
+        self.v_reg[VF] = !borrow as u8;
     }
 
     /// 8xyE - Set Vx = Vx SHL 1.
     fn shl(&mut self, x: usize, _y: usize) {
         let vx = self.v_reg[x];
-        self.v_reg[VF] = (vx >> 7) & 1;
         self.v_reg[x] = vx << 1;
+        self.v_reg[VF] = (vx >> 7) & 1;
     }
 
     /// 9xy0 - Skip next instruction if Vx != Vy.
