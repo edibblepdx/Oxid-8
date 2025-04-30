@@ -128,7 +128,8 @@ impl Oxid8 {
             };
         }
 
-        eprintln!("{:04x}", opcode.full());
+        // WARN: testing stuff
+        // eprintln!("{:04x}", opcode.full());
 
         match opcode.0 {
             0x0 => match opcode.kk() {

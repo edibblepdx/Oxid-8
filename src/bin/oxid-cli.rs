@@ -69,13 +69,18 @@ fn run(config: Config) -> io::Result<()> {
     while !emu.state.should_exit {
         let time = Instant::now();
 
-        if event::poll(Duration::from_millis(1))? {
-            if let Err(err) = handle_events(&mut emu.state) {
-                eprintln!("{err}");
-            }
+        let key = if event::poll(Duration::from_millis(1))? {
+            handle_events(&mut emu.state)?
+        } else {
+            None
+        };
+
+        // WARN: testing things
+        if let Some(k) = key {
+            eprintln!("{}", k);
         }
 
-        if let Err(err) = emu.core.run_cycle(None) {
+        if let Err(err) = emu.core.run_cycle(key) {
             eprintln!("{err}");
         }
 
@@ -103,20 +108,38 @@ fn run(config: Config) -> io::Result<()> {
     Ok(())
 }
 
-fn handle_events(emu_state: &mut EmuState) -> io::Result<()> {
+fn handle_events(emu_state: &mut EmuState) -> io::Result<Option<u8>> {
     match event::read()? {
         Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-            handle_key_event(key_event, emu_state)
+            Ok(handle_key_event(key_event, emu_state))
         }
-        _ => (),
-    };
-    Ok(())
+        _ => Ok(None),
+    }
 }
 
-fn handle_key_event(key_event: KeyEvent, emu_state: &mut EmuState) {
+fn handle_key_event(key_event: KeyEvent, emu_state: &mut EmuState) -> Option<u8> {
     match key_event.code {
-        KeyCode::Esc => emu_state.should_exit = true,
-        _ => (),
+        KeyCode::Esc => {
+            emu_state.should_exit = true;
+            None
+        }
+        KeyCode::Char('1') => Some(0x0),
+        KeyCode::Char('2') => Some(0x1),
+        KeyCode::Char('3') => Some(0x2),
+        KeyCode::Char('4') => Some(0x3),
+        KeyCode::Char('q') => Some(0x4),
+        KeyCode::Char('w') => Some(0x5),
+        KeyCode::Char('e') => Some(0x6),
+        KeyCode::Char('r') => Some(0x7),
+        KeyCode::Char('a') => Some(0x8),
+        KeyCode::Char('s') => Some(0x9),
+        KeyCode::Char('d') => Some(0xA),
+        KeyCode::Char('f') => Some(0xB),
+        KeyCode::Char('z') => Some(0xC),
+        KeyCode::Char('x') => Some(0xD),
+        KeyCode::Char('c') => Some(0xE),
+        KeyCode::Char('v') => Some(0xF),
+        _ => None,
     }
 }
 
