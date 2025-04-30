@@ -449,14 +449,13 @@ impl Oxid8 {
 
     /// ExA1 - Skip next instruction if key with the value of Vx is not pressed.
     fn sknp(&mut self, x: usize, key: Option<u8>) {
-        if key == None {
-            // No key pressed in general
-            self.pc += 2;
-        } else if let Some(k) = key {
-            // Some key press
-            if k != self.v_reg[x] {
-                self.pc += 2;
+        match key {
+            Some(k) => {
+                if k != self.v_reg[x] {
+                    self.pc += 2;
+                }
             }
+            None => self.pc += 2,
         }
     }
 
