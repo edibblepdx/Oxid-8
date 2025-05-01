@@ -208,8 +208,11 @@ impl Oxid8 {
         }
     }
 
+    pub fn sound(&self) -> bool {
+        self.st != 0
+    }
+
     pub fn set_key(&mut self, k: usize, val: bool) {
-        println!("setting key {}", k);
         // WARN: will panic if key out of bounds
         self.keys[k] = val;
     }

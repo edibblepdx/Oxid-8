@@ -157,6 +157,10 @@ fn run(config: Config) -> io::Result<()> {
             emu.core.dec_timers();
             last_timer_tick += TIMER_TICK;
         }
+
+        if emu.core.sound() {
+            print!("\x07");
+        }
     }
 
     exit()
