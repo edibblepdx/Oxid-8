@@ -11,9 +11,7 @@ Inside `src/bin` is `oxid-cli`—a lighter version without a menu and useful for
 
 ## Terminals that support the Kitty Keyboard Protocol 
 
-> Most terminals do not differentiate key press, release, and repeat.
-
-[read more](https://sw.kovidgoyal.net/kitty/keyboard-protocol/)
+> Most terminals do not differentiate key press, release, and repeat. [read more][Kitty Protocol]
 
 - The alacritty terminal
 - The ghostty terminal
@@ -33,3 +31,4 @@ Inside `src/bin` is `oxid-cli`—a lighter version without a menu and useful for
 This project is licensed under the [MIT License][License].
 
 [License]: ./LICENSE
+[Kitty Protocol]: https://sw.kovidgoyal.net/kitty/keyboard-protocol/
