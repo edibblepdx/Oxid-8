@@ -499,7 +499,7 @@ impl Oxid8 {
 
     /// Fx1E - Set I = I + Vx.
     fn add_ix(&mut self, x: usize) {
-        self.i_reg += self.v_reg[x] as u16;
+        self.i_reg = self.i_reg.wrapping_add(self.v_reg[x] as u16);
     }
 
     /// Fx29 - Set I = location of sprite for digit Vx.
