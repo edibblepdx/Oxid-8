@@ -130,6 +130,7 @@ impl Oxid8 {
         }
 
         // WARN: testing stuff
+
         // eprintln!("{:04x}", opcode.full());
         //if let Some(k) = key {
         //eprintln!("cycle key: {}", k)
@@ -208,6 +209,7 @@ impl Oxid8 {
     }
 
     pub fn set_key(&mut self, k: usize, val: bool) {
+        println!("setting key {}", k);
         // WARN: will panic if key out of bounds
         self.keys[k] = val;
     }
@@ -225,8 +227,6 @@ impl Oxid8 {
             .copy_from_slice(&FONTSET);
     }
 
-    // TODO: remove reading the file from the emu, only have it read the
-    // resulting slice
     pub fn load_rom(&mut self, filename: &str) -> io::Result<()> {
         let rom: Vec<u8> = fs::read(filename)?;
         let len = rom.len();
