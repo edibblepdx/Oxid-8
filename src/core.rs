@@ -31,7 +31,6 @@ pub const SCREEN_HEIGHT: usize = 32;
 const RAM_SIZE: usize = 4096;
 const NUM_REGS: usize = 16;
 const STACK_SIZE: usize = 16;
-const NUM_KEYS: usize = 16;
 const VF: usize = 15;
 const START_ADDR: u16 = 0x200;
 
@@ -41,7 +40,6 @@ struct Opcode(u8, u8, u8, u8);
 // struct Oxid8 source modified:
 // https://aquova.net/emudev/chip8/
 // All methods are original
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Oxid8 {
     pc: u16,                                      // Program Counter
@@ -51,13 +49,11 @@ pub struct Oxid8 {
     i_reg: u16,                                   // 16[12]-bit I Register
     sp: u16,                                      // Stack Pointer
     stack: [u16; STACK_SIZE],                     // Stack
-    keys: [bool; NUM_KEYS],                       // Keys (0-F)
     dt: u8,                                       // Delay Timer
     st: u8,                                       // Sound Timer
     rng: ThreadRng,                               // RNG
 }
 
-#[allow(dead_code)]
 impl Opcode {
     fn new(byte1: u8, byte2: u8) -> Self {
         Self(
@@ -106,7 +102,6 @@ impl fmt::Display for Opcode {
 }
 
 /// Oxid8 Core
-#[allow(dead_code)]
 impl Oxid8 {
     pub fn new() -> Self {
         Self::default()
@@ -251,7 +246,6 @@ impl Default for Oxid8 {
             i_reg: 0,
             sp: 0,
             stack: [0; STACK_SIZE],
-            keys: [false; NUM_KEYS],
             dt: 0,
             st: 0,
             rng: rng(),
@@ -261,7 +255,6 @@ impl Default for Oxid8 {
 
 /// Oxid8 CPU Instructions
 /// Source: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#0.1
-#[allow(dead_code)]
 impl Oxid8 {
     /// Naming Conventions:
     /// -------------------
