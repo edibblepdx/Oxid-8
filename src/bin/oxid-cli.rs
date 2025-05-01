@@ -66,20 +66,11 @@ fn run(config: Config) -> io::Result<()> {
     while !emu.state.should_exit {
         let time = Instant::now();
 
-        let key = if event::poll(Duration::from_millis(1))? {
-            handle_events(&mut emu.state)?
-        } else {
-            None
-        };
-
-        // WARN: testing things
-        /*
-        if let Some(k) = key {
-            eprintln!("{}", k);
+        if event::poll(Duration::from_millis(1))? {
+            handle_events(&mut emu)?;
         }
-        */
 
-        if let Err(err) = emu.core.run_cycle(key) {
+        if let Err(err) = emu.core.run_cycle() {
             eprintln!("{err}");
         }
 
@@ -108,19 +99,29 @@ fn run(config: Config) -> io::Result<()> {
     Ok(())
 }
 
-fn handle_events(emu_state: &mut EmuState) -> io::Result<Option<u8>> {
+fn handle_events(emu: &mut Emu) -> io::Result<()> {
     match event::read()? {
         Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-            Ok(handle_key_event(key_event, emu_state))
+            eprintln!("press");
+            if let Some(k) = handle_key_event(key_event, &mut emu.state) {
+                emu.core.set_key(k as usize, true);
+            }
         }
-        _ => Ok(None),
+        Event::Key(key_event) if key_event.kind == KeyEventKind::Release => {
+            eprintln!("release");
+            if let Some(k) = handle_key_event(key_event, &mut emu.state) {
+                emu.core.set_key(k as usize, false);
+            }
+        }
+        _ => (),
     }
+    Ok(())
 }
 
-fn handle_key_event(key_event: KeyEvent, emu_state: &mut EmuState) -> Option<u8> {
+fn handle_key_event(key_event: KeyEvent, state: &mut EmuState) -> Option<u8> {
     match key_event.code {
         KeyCode::Esc => {
-            emu_state.should_exit = true;
+            state.should_exit = true;
             None
         }
         /*

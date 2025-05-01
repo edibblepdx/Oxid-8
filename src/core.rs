@@ -31,6 +31,7 @@ pub const SCREEN_HEIGHT: usize = 32;
 const RAM_SIZE: usize = 4096;
 const NUM_REGS: usize = 16;
 const STACK_SIZE: usize = 16;
+const NUM_KEYS: usize = 16;
 const VF: usize = 15;
 const START_ADDR: u16 = 0x200;
 
@@ -49,6 +50,7 @@ pub struct Oxid8 {
     i_reg: u16,                                   // 16[12]-bit I Register
     sp: u16,                                      // Stack Pointer
     stack: [u16; STACK_SIZE],                     // Stack
+    keys: [bool; NUM_KEYS],                       // Keys (0-F)
     dt: u8,                                       // Delay Timer
     st: u8,                                       // Sound Timer
     rng: ThreadRng,                               // RNG
@@ -107,7 +109,7 @@ impl Oxid8 {
         Self::default()
     }
 
-    pub fn run_cycle(&mut self, key: Option<u8>) -> Result<(), String> {
+    pub fn run_cycle(&mut self) -> Result<(), String> {
         // TODO: fix return type
         let opcode = Opcode::new(
             self.ram[self.pc as usize],     //
@@ -129,6 +131,14 @@ impl Oxid8 {
 
         // WARN: testing stuff
         // eprintln!("{:04x}", opcode.full());
+        //if let Some(k) = key {
+        //eprintln!("cycle key: {}", k)
+        //}
+
+        //for i in 0..self.keys.len() {
+        //eprint!("{}, ", self.keys[i]);
+        //}
+        //eprintln!();
 
         match opcode.0 {
             0x0 => match opcode.kk() {
@@ -167,13 +177,13 @@ impl Oxid8 {
                 );
             }
             0xE => match opcode.kk() {
-                0x9E => self.skp(opcode.x() as usize, key),
-                0xA1 => self.sknp(opcode.x() as usize, key),
+                0x9E => self.skp(opcode.x() as usize),
+                0xA1 => self.sknp(opcode.x() as usize),
                 _ => invalid!(),
             },
             0xF => match opcode.kk() {
                 0x07 => self.ld_xdt(opcode.x() as usize),
-                0x0A => self.ld_xk(opcode.x() as usize, key),
+                0x0A => self.ld_xk(opcode.x() as usize),
                 0x15 => self.ld_dtx(opcode.x() as usize),
                 0x18 => self.ld_stx(opcode.x() as usize),
                 0x1E => self.add_ix(opcode.x() as usize),
@@ -186,6 +196,14 @@ impl Oxid8 {
             _ => invalid!(),
         }
         Ok(())
+    }
+
+    pub fn set_key(&mut self, k: usize, val: bool) {
+        self.keys[k] = val;
+    }
+
+    pub fn clear_keys(&mut self) {
+        self.keys = [false; NUM_KEYS];
     }
 
     pub fn screen_ref(&self) -> &[bool] {
@@ -246,6 +264,7 @@ impl Default for Oxid8 {
             i_reg: 0,
             sp: 0,
             stack: [0; STACK_SIZE],
+            keys: [false; NUM_KEYS],
             dt: 0,
             st: 0,
             rng: rng(),
@@ -435,23 +454,16 @@ impl Oxid8 {
     }
 
     /// Ex9E - Skip next instruction if key with the value of Vx is pressed.
-    fn skp(&mut self, x: usize, key: Option<u8>) {
-        if let Some(k) = key {
-            if k == self.v_reg[x] {
-                self.pc += 2;
-            }
+    fn skp(&mut self, x: usize) {
+        if self.keys[self.v_reg[x] as usize] {
+            self.pc += 2;
         }
     }
 
     /// ExA1 - Skip next instruction if key with the value of Vx is not pressed.
-    fn sknp(&mut self, x: usize, key: Option<u8>) {
-        match key {
-            Some(k) => {
-                if k != self.v_reg[x] {
-                    self.pc += 2;
-                }
-            }
-            None => self.pc += 2,
+    fn sknp(&mut self, x: usize) {
+        if !self.keys[self.v_reg[x] as usize] {
+            self.pc += 2;
         }
     }
 
@@ -461,10 +473,15 @@ impl Oxid8 {
     }
 
     /// Fx0A - Wait for a key press, store the value of the key in Vx.
-    fn ld_xk(&mut self, x: usize, key: Option<u8>) {
-        if let Some(k) = key {
-            self.v_reg[x] = k;
-        } else {
+    fn ld_xk(&mut self, x: usize) {
+        let mut pressed = false;
+        for i in 0..self.keys.len() {
+            if self.keys[i] {
+                self.v_reg[x] = i as u8;
+                pressed = true;
+            }
+        }
+        if !pressed {
             // set pc to previous state
             self.pc -= 2;
         }
