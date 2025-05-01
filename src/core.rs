@@ -198,7 +198,17 @@ impl Oxid8 {
         Ok(())
     }
 
+    pub fn dec_timers(&mut self) {
+        if self.dt > 0 {
+            self.dt -= 1;
+        }
+        if self.st > 0 {
+            self.st -= 1;
+        }
+    }
+
     pub fn set_key(&mut self, k: usize, val: bool) {
+        // WARN: will panic if key out of bounds
         self.keys[k] = val;
     }
 
@@ -504,7 +514,6 @@ impl Oxid8 {
 
     /// Fx29 - Set I = location of sprite for digit Vx.
     fn ld_fx(&mut self, x: usize) {
-        // WARN: not sure about this one
         self.i_reg = FONT_ADDR + (self.v_reg[x] as u16 * 5);
     }
 

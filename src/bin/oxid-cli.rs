@@ -10,7 +10,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-const TICK_RATE: u64 = 1 / 700;
+const CPU_TICK: Duration = Duration::from_micros(1430); // 700Hz
+const TIMER_TICK: Duration = Duration::from_micros(16667); // 60Hz
 
 #[derive(Default)]
 struct Emu {
@@ -63,6 +64,9 @@ fn run(config: Config) -> io::Result<()> {
     let mut terminal = ratatui::init();
     terminal.clear()?;
 
+    let mut last_cpu_tick = Instant::now();
+    let mut last_timer_tick = Instant::now();
+
     while !emu.state.should_exit {
         let time = Instant::now();
 
@@ -70,29 +74,34 @@ fn run(config: Config) -> io::Result<()> {
             handle_events(&mut emu)?;
         }
 
-        if let Err(err) = emu.core.run_cycle() {
-            eprintln!("{err}");
+        if time.duration_since(last_cpu_tick) >= CPU_TICK {
+            if let Err(err) = emu.core.run_cycle() {
+                eprintln!("{err}");
+            }
+
+            last_cpu_tick += CPU_TICK;
+
+            terminal.draw(|frame| {
+                let area = frame.area();
+                emu.state.area = area;
+
+                frame.render_widget(
+                    Canvas::default()
+                        .x_bounds([0.0, SCREEN_WIDTH as f64])
+                        .y_bounds([0.0, SCREEN_HEIGHT as f64])
+                        .marker(Marker::HalfBlock)
+                        .paint(|ctx| {
+                            ctx.draw(&emu);
+                        }),
+                    area,
+                )
+            })?;
         }
 
-        let _ = terminal.draw(|frame| {
-            let area = frame.area();
-            emu.state.area = area;
-
-            frame.render_widget(
-                Canvas::default()
-                    .x_bounds([0.0, SCREEN_WIDTH as f64])
-                    .y_bounds([0.0, SCREEN_HEIGHT as f64])
-                    .marker(Marker::HalfBlock)
-                    .paint(|ctx| {
-                        ctx.draw(&emu);
-                    }),
-                area,
-            )
-        });
-
-        // TODO: check timers
-
-        while time.elapsed().as_secs() < TICK_RATE {} // spin
+        if time.duration_since(last_timer_tick) >= TIMER_TICK {
+            emu.core.dec_timers();
+            last_timer_tick += TIMER_TICK;
+        }
     }
 
     ratatui::restore();
