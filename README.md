@@ -11,7 +11,7 @@ Inside `src/bin` is `oxid-cli`—a lighter version without a menu and useful for
 
 ## Terminals that support the Kitty Keyboard Protocol 
 
-> Most terminals do not support key-up events.
+> Most terminals do not differentiate key press, release, and repeat.
 
 [read more](https://sw.kovidgoyal.net/kitty/keyboard-protocol/)
 
