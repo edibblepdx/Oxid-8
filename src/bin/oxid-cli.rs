@@ -23,6 +23,10 @@ use std::{
 const CPU_TICK: Duration = Duration::from_micros(1430); // 700Hz
 const TIMER_TICK: Duration = Duration::from_micros(16667); // 60Hz
 
+struct Config {
+    pub rom_path: String,
+}
+
 #[derive(Default)]
 struct Emu {
     core: Oxid8,
@@ -33,10 +37,6 @@ struct Emu {
 struct EmuState {
     should_exit: bool,
     area: ratatui::layout::Rect,
-}
-
-pub struct Config {
-    pub rom_path: String,
 }
 
 impl Config {
@@ -125,11 +125,11 @@ fn run(config: Config) -> io::Result<()> {
     while !emu.state.should_exit {
         let time = Instant::now();
 
-        if event::poll(Duration::from_millis(1))? {
-            handle_events(&mut emu)?;
-        }
-
         if time.duration_since(last_cpu_tick) >= CPU_TICK {
+            if event::poll(Duration::from_secs(0))? {
+                handle_events(&mut emu)?;
+            }
+
             if let Err(err) = emu.core.run_cycle() {
                 eprintln!("{err}");
             }
