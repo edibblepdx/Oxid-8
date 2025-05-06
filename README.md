@@ -22,7 +22,10 @@ Inside `src/bin` is `oxid-cli`—a lighter version without a menu and useful for
 
 ## TODO
 
+- Fix delayed / blocking keyboard
+- install signal handlers to allow suspend
 - wasm version
+- would like to make a neat shader
 - debug to step through instructions
 - super chip-8 extension
 
