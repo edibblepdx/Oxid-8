@@ -20,10 +20,13 @@ Inside `src/bin` is `oxid-cli`—a lighter version without a menu and useful for
 - The rio terminal
 - The WezTerm terminal
 
+## Sound
+
+Sound is played by printing the bell character `\x07`. If you don't hear anything when you are expecting to, it's possible that you may have muted the bell (I don't blame you).
+
 ## TODO
 
-- Fix delayed / blocking keyboard
-- install signal handlers to allow suspend
+- force redraw on resume
 - wasm version
 - would like to make a neat shader
 - debug to step through instructions
