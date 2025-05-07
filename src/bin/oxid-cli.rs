@@ -1,9 +1,11 @@
 use crossterm::{
+    cursor,
     event::{
-        self, Event, KeyCode, KeyEvent, KeyEventKind, KeyboardEnhancementFlags,
+        self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, KeyboardEnhancementFlags,
         PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
     },
     queue,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use oxid8::core::{Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH};
 use ratatui::{
@@ -13,10 +15,14 @@ use ratatui::{
     symbols::Marker,
     widgets::canvas::{Canvas, Painter, Shape},
 };
+use signal_hook::{
+    consts::{SIGCONT, SIGTSTP},
+    iterator::Signals,
+};
 use std::{
     env,
     io::{self, Stdout},
-    process,
+    process, thread,
     time::{Duration, Instant},
 };
 
@@ -53,6 +59,68 @@ impl Config {
     }
 }
 
+struct Term;
+
+impl Term {
+    pub fn init() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
+        Term::enter()?;
+        let stdout = io::stdout();
+        Terminal::new(CrosstermBackend::new(stdout))
+    }
+
+    pub fn enter() -> io::Result<()> {
+        let mut stdout = io::stdout();
+
+        crossterm::terminal::enable_raw_mode()?;
+        crossterm::execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
+
+        if matches!(
+            crossterm::terminal::supports_keyboard_enhancement(),
+            Ok(true)
+        ) {
+            queue!(
+                stdout,
+                PushKeyboardEnhancementFlags(
+                    KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                        | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+                        | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
+                        | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
+                )
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub fn exit() -> io::Result<()> {
+        let mut stdout = io::stdout();
+
+        crossterm::terminal::disable_raw_mode()?;
+        crossterm::execute!(stdout, LeaveAlternateScreen, cursor::Show)?;
+
+        if matches!(
+            crossterm::terminal::supports_keyboard_enhancement(),
+            Ok(true)
+        ) {
+            queue!(stdout, PopKeyboardEnhancementFlags)?;
+        }
+
+        ratatui::restore();
+        Ok(())
+    }
+
+    pub fn suspend() -> io::Result<()> {
+        Term::exit()?;
+        #[cfg(not(windows))]
+        signal_hook::low_level::raise(SIGTSTP)?;
+        Ok(())
+    }
+
+    pub fn resume() -> io::Result<()> {
+        Term::enter()
+    }
+}
+
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
     let config = Config::build(&args).unwrap_or_else(|err| {
@@ -60,64 +128,29 @@ fn main() -> io::Result<()> {
         process::exit(1);
     });
 
+    let mut signals = Signals::new([SIGCONT])?;
+    thread::spawn(move || {
+        for _ in signals.forever() {
+            Term::resume().unwrap_or_else(|_| panic!("ERROR::Failed to resume terminal."));
+        }
+    });
+
     if let Err(e) = run(config) {
         eprintln!("Application error: {e}");
-        exit()?;
+        Term::exit()?;
         process::exit(1);
     }
 
     Ok(())
 }
 
-fn enter() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
-    let mut terminal = ratatui::init();
-    terminal.clear()?;
-
-    let mut stdout = io::stdout();
-
-    let supports_keyboard_enhancement = matches!(
-        crossterm::terminal::supports_keyboard_enhancement(),
-        Ok(true)
-    );
-
-    if supports_keyboard_enhancement {
-        queue!(
-            stdout,
-            PushKeyboardEnhancementFlags(
-                KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-                    | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
-                    | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
-                    | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
-            )
-        )?;
-    }
-
-    Ok(terminal)
-}
-
-fn exit() -> io::Result<()> {
-    let mut stdout = io::stdout();
-
-    let supports_keyboard_enhancement = matches!(
-        crossterm::terminal::supports_keyboard_enhancement(),
-        Ok(true)
-    );
-
-    if supports_keyboard_enhancement {
-        queue!(stdout, PopKeyboardEnhancementFlags)?;
-    }
-
-    ratatui::restore();
-
-    Ok(())
-}
-
 fn run(config: Config) -> io::Result<()> {
-    let mut terminal = enter()?;
-
     let mut emu = Emu::default();
     emu.core.load_rom(&config.rom_path)?;
     emu.core.load_font();
+
+    let mut terminal = Term::init()?;
+    terminal.clear()?;
 
     let mut last_cpu_tick = Instant::now();
     let mut last_timer_tick = Instant::now();
@@ -163,11 +196,16 @@ fn run(config: Config) -> io::Result<()> {
         }
     }
 
-    exit()
+    Term::exit()
 }
 
 fn handle_events(emu: &mut Emu) -> io::Result<()> {
     match event::read()? {
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('z'),
+            modifiers: KeyModifiers::CONTROL,
+            ..
+        }) => return Term::suspend(),
         Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
             if let Some(k) = handle_key_event(key_event, &mut emu.state) {
                 emu.core.set_key(k as usize, true);
