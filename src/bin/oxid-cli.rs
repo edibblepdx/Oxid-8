@@ -9,8 +9,8 @@ use crossterm::{
 };
 use oxid8::core::{Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH};
 use ratatui::{
-    Terminal,
     backend::CrosstermBackend,
+    layout::{Constraint, Flex, Layout, Rect},
     style::Color,
     symbols::Marker,
     widgets::canvas::{Canvas, Painter, Shape},
@@ -22,7 +22,9 @@ use signal_hook::{
 use std::{
     env,
     io::{self, Stdout},
-    process, thread,
+    process,
+    sync::mpsc,
+    thread,
     time::{Duration, Instant},
 };
 
@@ -59,13 +61,14 @@ impl Config {
     }
 }
 
-struct Term;
+struct Terminal;
 
-impl Term {
-    pub fn init() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
-        Term::enter()?;
+impl Terminal {
+    /// Create and return a new Terminal (can fail)
+    pub fn init() -> io::Result<ratatui::Terminal<CrosstermBackend<Stdout>>> {
+        Terminal::enter()?;
         let stdout = io::stdout();
-        Terminal::new(CrosstermBackend::new(stdout))
+        ratatui::Terminal::new(CrosstermBackend::new(stdout))
     }
 
     pub fn enter() -> io::Result<()> {
@@ -95,9 +98,6 @@ impl Term {
     pub fn exit() -> io::Result<()> {
         let mut stdout = io::stdout();
 
-        crossterm::terminal::disable_raw_mode()?;
-        crossterm::execute!(stdout, LeaveAlternateScreen, cursor::Show)?;
-
         if matches!(
             crossterm::terminal::supports_keyboard_enhancement(),
             Ok(true)
@@ -105,39 +105,34 @@ impl Term {
             queue!(stdout, PopKeyboardEnhancementFlags)?;
         }
 
-        ratatui::restore();
+        crossterm::terminal::disable_raw_mode()?;
+        crossterm::execute!(stdout, LeaveAlternateScreen, cursor::Show)?;
+
         Ok(())
     }
 
     pub fn suspend() -> io::Result<()> {
-        Term::exit()?;
+        Terminal::exit()?;
         #[cfg(not(windows))]
         signal_hook::low_level::raise(SIGTSTP)?;
         Ok(())
     }
 
     pub fn resume() -> io::Result<()> {
-        Term::enter()
+        Terminal::enter()
     }
 }
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
     let config = Config::build(&args).unwrap_or_else(|err| {
-        eprintln!("Problem parsing arguments: {err}");
+        eprintln!("Error parsing arguments: {err}");
         process::exit(1);
-    });
-
-    let mut signals = Signals::new([SIGCONT])?;
-    thread::spawn(move || {
-        for _ in signals.forever() {
-            Term::resume().unwrap_or_else(|_| panic!("ERROR::Failed to resume terminal."));
-        }
     });
 
     if let Err(e) = run(config) {
         eprintln!("Application error: {e}");
-        Term::exit()?;
+        Terminal::exit()?;
         process::exit(1);
     }
 
@@ -145,12 +140,23 @@ fn main() -> io::Result<()> {
 }
 
 fn run(config: Config) -> io::Result<()> {
+    // Install Signal Hooks
+    let (tx, rx) = mpsc::channel();
+    let mut signals = Signals::new([SIGCONT])?;
+    thread::spawn(move || {
+        for signal in signals.forever() {
+            tx.send(signal).unwrap();
+        }
+    });
+
+    // Terminal
+    let mut terminal = Terminal::init()?;
+    terminal.clear()?;
+
+    // Emulator
     let mut emu = Emu::default();
     emu.core.load_rom(&config.rom_path)?;
     emu.core.load_font();
-
-    let mut terminal = Term::init()?;
-    terminal.clear()?;
 
     let mut last_cpu_tick = Instant::now();
     let mut last_timer_tick = Instant::now();
@@ -158,6 +164,18 @@ fn run(config: Config) -> io::Result<()> {
     while !emu.state.should_exit {
         let time = Instant::now();
 
+        // Poll Signals
+        if let Ok(signal) = rx.try_recv() {
+            match signal {
+                SIGCONT => {
+                    Terminal::resume()?;
+                    terminal.clear()?;
+                }
+                _ => (),
+            }
+        }
+
+        // Emu Cycle
         if time.duration_since(last_cpu_tick) >= CPU_TICK {
             if event::poll(Duration::from_secs(0))? {
                 handle_events(&mut emu)?;
@@ -168,8 +186,15 @@ fn run(config: Config) -> io::Result<()> {
             }
 
             terminal.draw(|frame| {
-                let area = frame.area();
-                emu.state.area = area;
+                // Clipping area
+                emu.state.area = frame.area();
+
+                // Drawing area
+                let area = center(
+                    frame.area(),
+                    Constraint::Length(SCREEN_WIDTH as u16),
+                    Constraint::Length(SCREEN_HEIGHT as u16),
+                );
 
                 frame.render_widget(
                     Canvas::default()
@@ -186,6 +211,7 @@ fn run(config: Config) -> io::Result<()> {
             last_cpu_tick += CPU_TICK;
         }
 
+        // Decrement Timers
         if time.duration_since(last_timer_tick) >= TIMER_TICK {
             emu.core.dec_timers();
             last_timer_tick += TIMER_TICK;
@@ -196,7 +222,15 @@ fn run(config: Config) -> io::Result<()> {
         }
     }
 
-    Term::exit()
+    Terminal::exit()
+}
+
+fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
+    let [area] = Layout::horizontal([horizontal])
+        .flex(Flex::Center)
+        .areas(area);
+    let [area] = Layout::vertical([vertical]).flex(Flex::Center).areas(area);
+    area
 }
 
 fn handle_events(emu: &mut Emu) -> io::Result<()> {
@@ -205,7 +239,7 @@ fn handle_events(emu: &mut Emu) -> io::Result<()> {
             code: KeyCode::Char('z'),
             modifiers: KeyModifiers::CONTROL,
             ..
-        }) => return Term::suspend(),
+        }) => return Terminal::suspend(),
         Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
             if let Some(k) = handle_key_event(key_event, &mut emu.state) {
                 emu.core.set_key(k as usize, true);
