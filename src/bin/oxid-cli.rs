@@ -41,11 +41,13 @@ struct Emu {
     state: EmuState,
 }
 
-#[derive(Default)]
 struct EmuState {
     should_exit: bool,
-    area: ratatui::layout::Rect,
+    area: Rect,
+    enhanced: bool,
 }
+
+struct Terminal;
 
 impl Config {
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
@@ -61,7 +63,18 @@ impl Config {
     }
 }
 
-struct Terminal;
+impl Default for EmuState {
+    fn default() -> Self {
+        Self {
+            should_exit: false,
+            area: Rect::default(),
+            enhanced: matches!(
+                crossterm::terminal::supports_keyboard_enhancement(),
+                Ok(true)
+            ),
+        }
+    }
+}
 
 impl Terminal {
     /// Create and return a new Terminal (can fail)
@@ -213,6 +226,11 @@ fn run(config: Config) -> io::Result<()> {
                     area,
                 )
             })?;
+
+            // To support more terminals
+            if !emu.state.enhanced {
+                emu.core.clear_keys();
+            }
 
             last_cpu_tick += CPU_TICK;
         }
