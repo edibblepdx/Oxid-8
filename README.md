@@ -20,13 +20,15 @@ is a Chip-8 interpreter written in rust and drawn to the terminal using `ratatui
 - The rio terminal
 - The WezTerm terminal
 
+Non-kitty terminals are supported by clearing the virtual keyboard after each cycle. The result is playable but is noticeably worse.
+
 ## Sound
 
 Sound is played by printing the bell character `\x07`. If you don't hear anything when you are expecting to, it's possible that you may have muted the bell (I don't blame you).
 
 ## TODO
 
-- force redraw on resume
+- menus
 - wasm version
 - would like to make a neat shader
 - debug to step through instructions
