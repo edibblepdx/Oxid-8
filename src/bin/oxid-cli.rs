@@ -145,7 +145,9 @@ fn run(config: Config) -> io::Result<()> {
     let mut signals = Signals::new([SIGCONT])?;
     thread::spawn(move || {
         for signal in signals.forever() {
-            tx.send(signal).unwrap();
+            if tx.send(signal).is_err() {
+                break; // Main thread terminated
+            }
         }
     });
 
@@ -189,17 +191,21 @@ fn run(config: Config) -> io::Result<()> {
                 // Clipping area
                 emu.state.area = frame.area();
 
+                // Rendering half-blocks
+                let width = SCREEN_WIDTH;
+                let height = SCREEN_HEIGHT / 2;
+
                 // Drawing area
                 let area = center(
                     frame.area(),
-                    Constraint::Length(SCREEN_WIDTH as u16),
-                    Constraint::Length(SCREEN_HEIGHT as u16),
+                    Constraint::Length(width as u16),
+                    Constraint::Length(height as u16),
                 );
 
                 frame.render_widget(
                     Canvas::default()
-                        .x_bounds([0.0, SCREEN_WIDTH as f64])
-                        .y_bounds([0.0, SCREEN_HEIGHT as f64])
+                        .x_bounds([0.0, width as f64])
+                        .y_bounds([0.0, height as f64])
                         .marker(Marker::HalfBlock)
                         .paint(|ctx| {
                             ctx.draw(&emu);
