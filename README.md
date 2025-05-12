@@ -20,7 +20,7 @@ is a Chip-8 interpreter written in rust and drawn to the terminal using `ratatui
 - The rio terminal
 - The WezTerm terminal
 
-Non-kitty terminals are supported by clearing the virtual keyboard after each cycle. The result is playable but is noticeably worse.
+Non-kitty terminals are supported by clearing the virtual keyboard after each cycle. The result is playable, but noticeably worse.
 
 ## Sound
 
