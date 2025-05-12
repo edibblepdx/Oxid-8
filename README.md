@@ -7,6 +7,8 @@
 ```
 is a Chip-8 interpreter written in rust and drawn to the terminal using `ratatui`.
 
+![oxid-tetris](https://github.com/user-attachments/assets/ab1f3bdc-4ab0-48f8-8563-1ee89c436e90)
+
 (Currently the only way to run a game) Inside `src/bin` is `oxid-cli`—a lighter version without a menu and useful for testing. You can load a ROM by passing its path as the first command-line argument (all others will be discarded). If no arguments are given, it will fallback to an `OXID_ROM` environment variable if set; it's recommended to use `realpath` with environment variables.
 
 ## Terminals that support the Kitty Keyboard Protocol 
