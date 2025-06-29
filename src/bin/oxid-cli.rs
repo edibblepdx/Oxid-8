@@ -7,7 +7,7 @@ use crossterm::{
     queue,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
-use oxid8::core::{Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH};
+use oxid8::core::{CPU_TICK, Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH, TIMER_TICK};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Flex, Layout, Rect},
@@ -27,9 +27,6 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-
-const CPU_TICK: Duration = Duration::from_micros(1430); // 700Hz
-const TIMER_TICK: Duration = Duration::from_micros(16667); // 60Hz
 
 struct Config {
     pub rom_path: String,

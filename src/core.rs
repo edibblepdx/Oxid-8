@@ -1,5 +1,10 @@
 use rand::{Rng, rng, rngs::ThreadRng};
-use std::{fmt, fs, io};
+use std::{fmt, fs, io, time::Duration};
+
+/// Standard CPU tick rate set to 700Hz. This value is not used internally.
+pub const CPU_TICK: Duration = Duration::from_micros(1430);
+/// Standard TIMER tick rate set to 60Hz. This value is not used internally.
+pub const TIMER_TICK: Duration = Duration::from_micros(16667);
 
 // Source for font and constants:
 // https://aquova.net/emudev/chip8/
@@ -109,6 +114,7 @@ impl Oxid8 {
         Self::default()
     }
 
+    /// Emulates a single cycle.
     pub fn run_cycle(&mut self) -> Result<(), String> {
         // TODO: fix return type
         let opcode = Opcode::new(
@@ -185,6 +191,7 @@ impl Oxid8 {
         Ok(())
     }
 
+    /// Decrements the delay and sound and timers.
     pub fn dec_timers(&mut self) {
         if self.dt > 0 {
             self.dt -= 1;
@@ -194,29 +201,41 @@ impl Oxid8 {
         }
     }
 
+    /// Returns true if sound timer is zero.
     pub fn sound(&self) -> bool {
         self.st != 0
     }
 
+    /// Sets a key on the virtual keypad.
+    ///
+    /// # Panics
+    ///
+    /// If key out of bounds.
+    /// Expects 0x0 - 0xF (0 - 15)
     pub fn set_key(&mut self, k: usize, val: bool) {
         // WARN: will panic if key out of bounds
         self.keys[k] = val;
     }
 
+    /// Clears the virtual keypad.
     pub fn clear_keys(&mut self) {
         self.keys = [false; NUM_KEYS];
     }
 
+    /// Returns a reference to the screen.
     pub fn screen_ref(&self) -> &[bool] {
         &self.screen
     }
 
+    /// Instructs the interpreter to load the fontset.
     pub fn load_font(&mut self) {
         self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)] //
             .copy_from_slice(&FONTSET);
     }
 
+    /// Loads a rom given a filename.
     pub fn load_rom(&mut self, filename: &str) -> io::Result<()> {
+        // TODO: use pathbuf instead
         let rom: Vec<u8> = fs::read(filename)?;
         let len = rom.len();
         if len > (RAM_SIZE - START_ADDR as usize) {
@@ -568,11 +587,11 @@ mod tests {
         let mut emu = Oxid8::new();
         emu.ram[START_ADDR as usize] = 0xFF;
         emu.ram[START_ADDR as usize + 1] = 0xFF;
-        assert!(
-            emu.run_cycle().is_err_and(|msg| {
-                msg == format!("Invalid Instruction: FFFF at {}", START_ADDR)
-            })
-        )
+        assert!(emu.run_cycle().is_err_and(|msg| msg
+            == format!(
+                "Invalid Instruction: FFFF at {}", //
+                START_ADDR                         //
+            )))
     }
 
     #[test]
