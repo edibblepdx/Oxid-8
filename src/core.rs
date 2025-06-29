@@ -115,37 +115,23 @@ impl Oxid8 {
             self.ram[self.pc as usize],     //
             self.ram[self.pc as usize + 1], //
         );
+
+        let pc_at_err = self.pc;
         self.pc += 2;
 
-        macro_rules! invalid {
-            () => {
-                // NOTE: this returning a result but push pop panicking doesn't seem like consistent
-                // behavior
-                return Err(format!(
-                    "Invalid Instruction: {:04X} at {}",
-                    opcode.full(),
-                    self.pc,
-                ))
-            };
-        }
-
-        // WARN: testing stuff
-
-        // eprintln!("{:04x}", opcode.full());
-        //if let Some(k) = key {
-        //eprintln!("cycle key: {}", k)
-        //}
-
-        //for i in 0..self.keys.len() {
-        //eprint!("{}, ", self.keys[i]);
-        //}
-        //eprintln!();
+        let invalid = || -> Result<(), String> {
+            Err(format!(
+                "Invalid Instruction: {:04X} at {}",
+                opcode.full(),
+                pc_at_err,
+            ))
+        };
 
         match opcode.0 {
             0x0 => match opcode.kk() {
                 0xE0 => self.cls(),
                 0xEE => self.ret(),
-                _ => invalid!(),
+                _ => invalid()?,
             },
             0x1 => self.jp_nnn(opcode.nnn()),
             0x2 => self.call(opcode.nnn()),
@@ -164,7 +150,7 @@ impl Oxid8 {
                 0x6 => self.shr(opcode.x() as usize, opcode.y() as usize),
                 0x7 => self.subn_xy(opcode.x() as usize, opcode.y() as usize),
                 0xE => self.shl(opcode.x() as usize, opcode.y() as usize),
-                _ => invalid!(),
+                _ => invalid()?,
             },
             0x9 => self.sne_xy(opcode.x() as usize, opcode.y() as usize),
             0xA => self.ld_innn(opcode.nnn()),
@@ -180,7 +166,7 @@ impl Oxid8 {
             0xE => match opcode.kk() {
                 0x9E => self.skp(opcode.x() as usize),
                 0xA1 => self.sknp(opcode.x() as usize),
-                _ => invalid!(),
+                _ => invalid()?,
             },
             0xF => match opcode.kk() {
                 0x07 => self.ld_xdt(opcode.x() as usize),
@@ -192,9 +178,9 @@ impl Oxid8 {
                 0x33 => self.ld_bx(opcode.x() as usize),
                 0x55 => self.ld_ix(opcode.x() as usize),
                 0x65 => self.ld_xi(opcode.x() as usize),
-                _ => invalid!(),
+                _ => invalid()?,
             },
-            _ => invalid!(),
+            _ => invalid()?,
         }
         Ok(())
     }
@@ -575,6 +561,18 @@ mod tests {
         assert_eq!(opcode.x(), 0x2);
         assert_eq!(opcode.y(), 0x3);
         assert_eq!(opcode.kk(), 0x34);
+    }
+
+    #[test]
+    fn invalid_opcode() {
+        let mut emu = Oxid8::new();
+        emu.ram[START_ADDR as usize] = 0xFF;
+        emu.ram[START_ADDR as usize + 1] = 0xFF;
+        assert!(
+            emu.run_cycle().is_err_and(|msg| {
+                msg == format!("Invalid Instruction: FFFF at {}", START_ADDR)
+            })
+        )
     }
 
     #[test]
