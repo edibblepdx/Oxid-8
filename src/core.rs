@@ -578,7 +578,18 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    fn push_pop() {
+        let mut emu = Oxid8::new();
+        assert_eq!(emu.sp, 0); // base stack pointer
+        emu.push(1); // push
+        assert_eq!(emu.sp, 1); // inc stack pointer
+        assert_eq!(emu.stack[0], 1); // value on stack
+        assert_eq!(emu.pop(), 1); // pop
+        assert_eq!(emu.sp, 0); // dec stack pointer
+    }
+
+    #[test]
+    #[should_panic(expected = "Stack Overflow")]
     fn push_panic() {
         let mut emu = Oxid8::new();
         for _ in 0..=STACK_SIZE {
@@ -587,14 +598,7 @@ mod tests {
     }
 
     #[test]
-    fn pop() {
-        let mut emu = Oxid8::new();
-        emu.push(1);
-        assert_eq!(emu.pop(), 1);
-    }
-
-    #[test]
-    #[should_panic]
+    #[should_panic(expected = "Stack Underflow")]
     fn pop_panic() {
         let mut emu = Oxid8::new();
         emu.pop();
