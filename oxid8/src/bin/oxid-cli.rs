@@ -7,7 +7,7 @@ use crossterm::{
     queue,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
-use oxid8::core::{CPU_TICK, Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH, TIMER_TICK};
+use oxid8_core::{CPU_TICK, Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH, TIMER_TICK};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Flex, Layout, Rect},

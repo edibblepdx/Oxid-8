@@ -2,8 +2,10 @@
 name = "oxid8"
 version = "0.1.0"
 edition = "2024"
-description = "CHIP-8 interpreter core."
-license = "MIT"
 
 [dependencies]
-rand = "0.9.1"
+oxid8-core = { path = "../oxid8-core" }
+crossterm = "0.29.0"
+indoc = "2.0.6"
+ratatui = "0.29.0"
+signal-hook = "0.3.17"

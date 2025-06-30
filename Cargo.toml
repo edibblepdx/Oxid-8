@@ -1,3 +1,3 @@
 [workspace]
 resolver = "3"
-members = ["oxid8", "oxid8-kitty"]
+members = ["oxid8-core", "oxid8"]

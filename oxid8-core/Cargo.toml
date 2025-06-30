@@ -1,0 +1,9 @@
+[package]
+name = "oxid8-core"
+version = "0.1.0"
+edition = "2024"
+description = "CHIP-8 interpreter core."
+license = "MIT"
+
+[dependencies]
+rand = "0.9.1"

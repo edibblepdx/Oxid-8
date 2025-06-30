@@ -1,5 +1,5 @@
 use crate::app::AppState;
-use crate::core::{Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH};
+use oxid8_core::{Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{

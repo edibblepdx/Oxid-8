@@ -1,5 +1,5 @@
 use oxid8::app::App;
-use oxid8::core::Oxid8;
+use oxid8_core::Oxid8;
 use std::{
     io::{self, Write, stdout},
     time::Instant,
