@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-oxid8-core = { path = "../oxid8-core" }
+oxid8-core = "0.1.0"
 crossterm = "0.29.0"
 indoc = "2.0.6"
 ratatui = "0.29.0"

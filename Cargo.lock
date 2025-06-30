@@ -342,7 +342,7 @@ version = "0.1.0"
 dependencies = [
  "crossterm 0.29.0",
  "indoc",
- "oxid8-core",
+ "oxid8-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ratatui",
  "signal-hook",
 ]
@@ -350,6 +350,15 @@ dependencies = [
 [[package]]
 name = "oxid8-core"
 version = "0.1.0"
+dependencies = [
+ "rand",
+]
+
+[[package]]
+name = "oxid8-core"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a4a97da48148b7d7e8fa06c17b97ecbf239f158f3d17c89e8c1b3e06a48d769"
 dependencies = [
  "rand",
 ]
