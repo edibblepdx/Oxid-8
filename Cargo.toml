@@ -1,13 +1,3 @@
-[package]
-name = "oxid8"
-version = "0.1.0"
-edition = "2024"
-description = "CHIP-8 interpreter core."
-license = "MIT"
-
-[dependencies]
-crossterm = "0.29.0"
-indoc = "2.0.6"
-rand = "0.9.1"
-ratatui = "0.29.0"
-signal-hook = "0.3.17"
+[workspace]
+resolver = "3"
+members = ["oxid8", "oxid8-kitty"]

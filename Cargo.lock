@@ -340,9 +340,16 @@ dependencies = [
 name = "oxid8"
 version = "0.1.0"
 dependencies = [
+ "rand",
+]
+
+[[package]]
+name = "oxid8-kitty"
+version = "0.1.0"
+dependencies = [
  "crossterm 0.29.0",
  "indoc",
- "rand",
+ "oxid8",
  "ratatui",
  "signal-hook",
 ]

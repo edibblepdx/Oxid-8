@@ -5,5 +5,4 @@
 //! COSMAC VIP and Telmac 1800.
 
 pub mod app;
-pub mod core;
 pub mod screens;

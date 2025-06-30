@@ -1,0 +1,11 @@
+[package]
+name = "oxid8-kitty"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+oxid8 = { path = "../oxid8" }
+crossterm = "0.29.0"
+indoc = "2.0.6"
+ratatui = "0.29.0"
+signal-hook = "0.3.17"
