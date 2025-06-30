@@ -2,6 +2,8 @@
 name = "oxid8"
 version = "0.1.0"
 edition = "2024"
+description = "CHIP-8 interpreter."
+license = "MIT"
 
 [dependencies]
 oxid8-core = "0.1.0"
