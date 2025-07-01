@@ -1,6 +1,6 @@
-//! # Oxid-8
+//! # Oxid-8 Core
 //!
-//! `oxid8` is an interpreter core for the Chip-8 programming language,
+//! `oxid8_core` is an interpreter core for the Chip-8 programming language,
 //! developed by Joseph Weisbecker in the mid-1970s for making games on the
 //! COSMAC VIP and Telmac 1800.
 
@@ -8,9 +8,18 @@ use rand::{Rng, rng, rngs::ThreadRng};
 use std::{fmt, fs, io, time::Duration};
 
 /// Standard CPU tick rate set to 700Hz. This value is not used internally.
+/// Run a CPU cycle this often.
 pub const CPU_TICK: Duration = Duration::from_micros(1430);
+
 /// Standard TIMER tick rate set to 60Hz. This value is not used internally.
+/// Decrement the timers and refresh the display this often.
 pub const TIMER_TICK: Duration = Duration::from_micros(16667);
+
+/// Virtual screen width (64 pixels).
+pub const SCREEN_WIDTH: usize = 64;
+
+/// Virtual screen height (32 pixels).
+pub const SCREEN_HEIGHT: usize = 32;
 
 // Source for font and constants:
 // https://aquova.net/emudev/chip8/
@@ -36,9 +45,6 @@ const FONTSET: [u8; FONTSET_SIZE] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
-pub const SCREEN_WIDTH: usize = 64;
-pub const SCREEN_HEIGHT: usize = 32;
-
 const RAM_SIZE: usize = 4096;
 const NUM_REGS: usize = 16;
 const STACK_SIZE: usize = 16;
@@ -52,6 +58,8 @@ struct Opcode(u8, u8, u8, u8);
 // struct Oxid8 source modified:
 // https://aquova.net/emudev/chip8/
 // All methods are original
+
+/// Oxid8
 #[derive(Debug)]
 pub struct Oxid8 {
     pc: u16,                                      // Program Counter
@@ -62,11 +70,13 @@ pub struct Oxid8 {
     sp: u16,                                      // Stack Pointer
     stack: [u16; STACK_SIZE],                     // Stack
     keys: [bool; NUM_KEYS],                       // Keys (0-F)
+    key: Option<usize>,                           // Stored key
     dt: u8,                                       // Delay Timer
     st: u8,                                       // Sound Timer
     rng: ThreadRng,                               // RNG
 }
 
+// 4-byte opcode.
 impl Opcode {
     fn new(byte1: u8, byte2: u8) -> Self {
         Self(
@@ -116,11 +126,19 @@ impl fmt::Display for Opcode {
 
 /// Oxid8 Core
 impl Oxid8 {
+    /// Create a new oxid8 instance.
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Emulates a single cycle.
+    ///
+    /// # Panics
+    ///
+    /// `push` and `pop` instructions can panic with a
+    /// Stack Overflow/Underflow error.
+    ///
+    /// Some opcodes may panic.
     pub fn run_cycle(&mut self) -> Result<(), String> {
         // TODO: fix return type
         let opcode = Opcode::new(
@@ -216,8 +234,8 @@ impl Oxid8 {
     ///
     /// # Panics
     ///
-    /// If key out of bounds.
-    /// Expects 0x0 - 0xF (0 - 15)
+    /// `set_key` panics if key is out of bounds.
+    /// Expects 0x0 - 0xF (0 - 15).
     pub fn set_key(&mut self, k: usize, val: bool) {
         // WARN: will panic if key out of bounds
         self.keys[k] = val;
@@ -257,6 +275,11 @@ impl Oxid8 {
         Ok(())
     }
 
+    // Pushes `val` onto the program stack and increments the stack pointer.
+    //
+    // # Panics
+    //
+    // `push` panics if the stack overflows.
     fn push(&mut self, val: u16) {
         match self.sp as usize {
             0..STACK_SIZE => {
@@ -267,6 +290,11 @@ impl Oxid8 {
         };
     }
 
+    // Pops top value off the program stack and decrements the stack pointer.
+    //
+    // # Panics
+    //
+    // `pop` panics if the stack underflows.
     fn pop(&mut self) -> u16 {
         match self.sp as usize {
             1..=STACK_SIZE => {
@@ -289,6 +317,7 @@ impl Default for Oxid8 {
             sp: 0,
             stack: [0; STACK_SIZE],
             keys: [false; NUM_KEYS],
+            key: None,
             dt: 0,
             st: 0,
             rng: rng(),
@@ -296,151 +325,151 @@ impl Default for Oxid8 {
     }
 }
 
-/// Oxid8 CPU Instructions
-/// Source: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#0.1
+// Oxid8 CPU Instructions
+// Source: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#0.1
 impl Oxid8 {
-    /// Naming Conventions:
-    /// -------------------
-    /// n:      half-byte
-    /// kk:     byte
-    /// nnn:    address
-    /// x,y,i:  register
-    /// dt:     delay timer
-    /// st:     sound timer
-    /// k:      key
-    /// -------------------
+    // Naming Conventions:
+    // -------------------
+    // n:      half-byte
+    // kk:     byte
+    // nnn:    address
+    // x,y,i:  register
+    // dt:     delay timer
+    // st:     sound timer
+    // k:      key
+    // -------------------
 
-    /// 00E0 - Clear the display.
+    // 00E0 - Clear the display.
     fn cls(&mut self) {
         self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
     }
 
-    /// 00EE - Return from a subroutine.
+    // 00EE - Return from a subroutine.
     fn ret(&mut self) {
         self.pc = self.pop();
     }
 
-    /// 1nnn - Jump to location nnn.
+    // 1nnn - Jump to location nnn.
     fn jp_nnn(&mut self, nnn: u16) {
         self.pc = nnn;
     }
 
-    /// 2nnn - Call subroutine at nnn.
+    // 2nnn - Call subroutine at nnn.
     fn call(&mut self, nnn: u16) {
         self.push(self.pc);
         self.pc = nnn;
     }
 
-    /// 3xkk - Skip next instruction if Vx = kk.
+    // 3xkk - Skip next instruction if Vx = kk.
     fn se_xkk(&mut self, x: usize, kk: u8) {
         if self.v_reg[x] == kk {
             self.pc += 2;
         }
     }
 
-    /// 4xkk - Skip next instruction if Vx != kk.
+    // 4xkk - Skip next instruction if Vx != kk.
     fn sne_xkk(&mut self, x: usize, kk: u8) {
         if self.v_reg[x] != kk {
             self.pc += 2;
         }
     }
 
-    /// 5xy0 - Skip next instruction if Vx = Vy.
+    // 5xy0 - Skip next instruction if Vx = Vy.
     fn se_xy(&mut self, x: usize, y: usize) {
         if self.v_reg[x] == self.v_reg[y] {
             self.pc += 2;
         }
     }
 
-    /// 6xkk - Set Vx = kk.
+    // 6xkk - Set Vx = kk.
     fn ld_xkk(&mut self, x: usize, kk: u8) {
         self.v_reg[x] = kk;
     }
 
-    /// 7xkk - Set Vx = Vx + kk.
+    // 7xkk - Set Vx = Vx + kk.
     fn add_xkk(&mut self, x: usize, kk: u8) {
         self.v_reg[x] = self.v_reg[x].wrapping_add(kk);
     }
 
-    /// 8xy0 - Set Vx = Vy.
+    // 8xy0 - Set Vx = Vy.
     fn ld_xy(&mut self, x: usize, y: usize) {
         self.v_reg[x] = self.v_reg[y];
     }
 
-    /// 8xy1 - Set Vx = Vx OR Vy.
+    // 8xy1 - Set Vx = Vx OR Vy.
     fn or(&mut self, x: usize, y: usize) {
         self.v_reg[x] |= self.v_reg[y];
     }
 
-    /// 8xy2 - Set Vx = Vx AND Vy.
+    // 8xy2 - Set Vx = Vx AND Vy.
     fn and(&mut self, x: usize, y: usize) {
         self.v_reg[x] &= self.v_reg[y];
     }
 
-    /// 8xy3 - Set Vx = Vx XOR Vy.
+    // 8xy3 - Set Vx = Vx XOR Vy.
     fn xor(&mut self, x: usize, y: usize) {
         self.v_reg[x] ^= self.v_reg[y];
     }
 
-    /// 8xy4 - Set Vx = Vx + Vy, set VF = carry.
+    // 8xy4 - Set Vx = Vx + Vy, set VF = carry.
     fn add_xy(&mut self, x: usize, y: usize) {
         let (vx, carry) = self.v_reg[x].overflowing_add(self.v_reg[y]);
         self.v_reg[x] = vx;
         self.v_reg[VF] = carry as u8;
     }
 
-    /// 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow.
+    // 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow.
     fn sub_xy(&mut self, x: usize, y: usize) {
         let (vx, borrow) = self.v_reg[x].overflowing_sub(self.v_reg[y]);
         self.v_reg[x] = vx;
         self.v_reg[VF] = !borrow as u8;
     }
 
-    /// 8xy6 - Set Vx = Vx SHR 1.
+    // 8xy6 - Set Vx = Vx SHR 1.
     fn shr(&mut self, x: usize, _y: usize) {
         let vx = self.v_reg[x];
         self.v_reg[x] = vx >> 1;
         self.v_reg[VF] = vx & 1;
     }
 
-    /// 8xy7 - Set Vx = Vy - Vx, set VF = NOT borrow.
+    // 8xy7 - Set Vx = Vy - Vx, set VF = NOT borrow.
     fn subn_xy(&mut self, x: usize, y: usize) {
         let (vx, borrow) = self.v_reg[y].overflowing_sub(self.v_reg[x]);
         self.v_reg[x] = vx;
         self.v_reg[VF] = !borrow as u8;
     }
 
-    /// 8xyE - Set Vx = Vx SHL 1.
+    // 8xyE - Set Vx = Vx SHL 1.
     fn shl(&mut self, x: usize, _y: usize) {
         let vx = self.v_reg[x];
         self.v_reg[x] = vx << 1;
         self.v_reg[VF] = (vx >> 7) & 1;
     }
 
-    /// 9xy0 - Skip next instruction if Vx != Vy.
+    // 9xy0 - Skip next instruction if Vx != Vy.
     fn sne_xy(&mut self, x: usize, y: usize) {
         if self.v_reg[x] != self.v_reg[y] {
             self.pc += 2;
         }
     }
 
-    /// Annn - Set I = nnn.
+    // Annn - Set I = nnn.
     fn ld_innn(&mut self, nnn: u16) {
         self.i_reg = nnn;
     }
 
-    /// Bnnn - Jump to location nnn + V0.
+    // Bnnn - Jump to location nnn + V0.
     fn jp_0nnn(&mut self, nnn: u16) {
         self.pc = nnn + self.v_reg[0] as u16;
     }
 
-    /// Cxkk - Set Vx = random byte AND kk.
+    // Cxkk - Set Vx = random byte AND kk.
     fn rnd(&mut self, x: usize, kk: u8) {
         self.v_reg[x] = self.rng.random_range(0..=0xFF) as u8 & kk;
     }
 
-    /// Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
-    /// set VF = collision.
+    // Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
+    // set VF = collision.
     fn drw(&mut self, x: usize, y: usize, n: u8) {
         // a sprite is a byte wide and n in [1,15] rows where n is an integer
         let (x, y) = (
@@ -477,61 +506,71 @@ impl Oxid8 {
         }
     }
 
-    /// Ex9E - Skip next instruction if key with the value of Vx is pressed.
+    // Ex9E - Skip next instruction if key with the value of Vx is pressed.
     fn skp(&mut self, x: usize) {
         if self.keys[self.v_reg[x] as usize] {
             self.pc += 2;
         }
     }
 
-    /// ExA1 - Skip next instruction if key with the value of Vx is not pressed.
+    // ExA1 - Skip next instruction if key with the value of Vx is not pressed.
     fn sknp(&mut self, x: usize) {
         if !self.keys[self.v_reg[x] as usize] {
             self.pc += 2;
         }
     }
 
-    /// Fx07 - Set Vx = delay timer value.
+    // Fx07 - Set Vx = delay timer value.
     fn ld_xdt(&mut self, x: usize) {
         self.v_reg[x] = self.dt;
     }
 
-    /// Fx0A - Wait for a key press, store the value of the key in Vx.
+    // Fx0A - Wait for a key press, store the value of the key in Vx.
     fn ld_xk(&mut self, x: usize) {
-        let mut pressed = false;
-        for i in 0..self.keys.len() {
-            if self.keys[i] {
-                self.v_reg[x] = i as u8;
-                pressed = true;
+        match self.key {
+            Some(k) => {
+                // Wait for key release
+                if !self.keys[k] {
+                    self.v_reg[x] = k as u8;
+                    self.key = None;
+                    return;
+                }
+            }
+            None => {
+                // Store key press
+                for (k, &pressed) in self.keys.iter().enumerate() {
+                    if pressed {
+                        self.key = Some(k);
+                        break;
+                    }
+                }
             }
         }
-        if !pressed {
-            // set pc to previous state
-            self.pc -= 2;
-        }
+        // Halt: set pc to previous state
+        self.pc -= 2;
     }
 
-    /// Fx15 - Set delay timer = Vx.
+    // Fx15 - Set delay timer = Vx.
     fn ld_dtx(&mut self, x: usize) {
         self.dt = self.v_reg[x];
     }
 
-    /// Fx18 - Set sound timer = Vx.
+    // Fx18 - Set sound timer = Vx.
     fn ld_stx(&mut self, x: usize) {
         self.st = self.v_reg[x];
     }
 
-    /// Fx1E - Set I = I + Vx.
+    // Fx1E - Set I = I + Vx.
     fn add_ix(&mut self, x: usize) {
         self.i_reg = self.i_reg.wrapping_add(self.v_reg[x] as u16);
     }
 
-    /// Fx29 - Set I = location of sprite for digit Vx.
+    // Fx29 - Set I = location of sprite for digit Vx.
     fn ld_fx(&mut self, x: usize) {
         self.i_reg = FONT_ADDR + (self.v_reg[x] as u16 * 5);
     }
 
-    /// Fx33 - Store BCD representation of Vx in memory locations I, I+1, and I+2.
+    // Fx33 - Store BCD representation of Vx in memory locations I, I+1, and I+2.
     fn ld_bx(&mut self, x: usize) {
         let i = self.i_reg as usize;
         let v = self.v_reg[x];
@@ -540,18 +579,16 @@ impl Oxid8 {
         self.ram[i + 2] = v % 10;
     }
 
-    /// Fx55 - Store registers V0 through Vx in memory starting at location I.
+    // Fx55 - Store registers V0 through Vx in memory starting at location I.
     fn ld_ix(&mut self, x: usize) {
-        for i in 0..=x {
-            self.ram[self.i_reg as usize + i] = self.v_reg[i];
-        }
+        let i = self.i_reg as usize;
+        self.ram[i..=(i + x)].copy_from_slice(&self.v_reg[0..=x]);
     }
 
-    /// Fx65 - Read registers V0 through Vx from memory starting at location I.
+    // Fx65 - Read registers V0 through Vx from memory starting at location I.
     fn ld_xi(&mut self, x: usize) {
-        for i in 0..=x {
-            self.v_reg[i] = self.ram[self.i_reg as usize + i];
-        }
+        let i = self.i_reg as usize;
+        self.v_reg[0..=x].copy_from_slice(&self.ram[i..=(i + x)]);
     }
 }
 

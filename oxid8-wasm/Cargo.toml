@@ -2,5 +2,17 @@
 name = "oxid8-wasm"
 version = "0.1.0"
 edition = "2024"
+authors = ["Ethan Dibble <edibble@pdx.edu>"]
+description = "WASM bindings for oxid8-core."
+repository = "https://github.com/edibblepdx/Oxid-8"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
 
 [dependencies]
+oxid8-core = { path = "../oxid8-core"}
+getrandom = { version = "0.3", features = ["wasm_js"] }
+wasm-bindgen = "0.2.100"
+
+[workspace]

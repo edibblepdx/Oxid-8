@@ -2,7 +2,9 @@
 name = "oxid8-core"
 version = "0.1.0"
 edition = "2024"
+authors = ["Ethan Dibble <edibble@pdx.edu>"]
 description = "CHIP-8 interpreter core."
+repository = "https://github.com/edibblepdx/Oxid-8"
 license = "MIT"
 
 [dependencies]

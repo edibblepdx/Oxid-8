@@ -197,6 +197,19 @@ fn run(config: Config) -> io::Result<()> {
                 eprintln!("{err}");
             }
 
+            // To support more terminals
+            if !emu.state.enhanced {
+                emu.core.clear_keys();
+            }
+
+            last_cpu_tick += CPU_TICK;
+        }
+
+        // Decrement Timers
+        if time.duration_since(last_timer_tick) >= TIMER_TICK {
+            emu.core.dec_timers();
+            last_timer_tick += TIMER_TICK;
+
             terminal.draw(|frame| {
                 // Clipping area
                 emu.state.area = frame.area();
@@ -223,19 +236,6 @@ fn run(config: Config) -> io::Result<()> {
                     area,
                 )
             })?;
-
-            // To support more terminals
-            if !emu.state.enhanced {
-                emu.core.clear_keys();
-            }
-
-            last_cpu_tick += CPU_TICK;
-        }
-
-        // Decrement Timers
-        if time.duration_since(last_timer_tick) >= TIMER_TICK {
-            emu.core.dec_timers();
-            last_timer_tick += TIMER_TICK;
         }
 
         if emu.core.sound() {
