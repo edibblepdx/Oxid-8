@@ -21,6 +21,9 @@ pub const SCREEN_WIDTH: usize = 64;
 /// Virtual screen height (32 pixels).
 pub const SCREEN_HEIGHT: usize = 32;
 
+/// Virtual screen area (2048 pixels).
+pub const SCREEN_AREA: usize = SCREEN_WIDTH * SCREEN_HEIGHT;
+
 // Source for font and constants:
 // https://aquova.net/emudev/chip8/
 const FONTSET_SIZE: usize = 80;
@@ -62,18 +65,18 @@ struct Opcode(u8, u8, u8, u8);
 /// Oxid8
 #[derive(Debug)]
 pub struct Oxid8 {
-    pc: u16,                                      // Program Counter
-    ram: [u8; RAM_SIZE],                          // RAM
-    screen: [bool; SCREEN_WIDTH * SCREEN_HEIGHT], // Monochrome Display
-    v_reg: [u8; NUM_REGS],                        // 8-bit V Registers
-    i_reg: u16,                                   // 16[12]-bit I Register
-    sp: u16,                                      // Stack Pointer
-    stack: [u16; STACK_SIZE],                     // Stack
-    keys: [bool; NUM_KEYS],                       // Keys (0-F)
-    key: Option<usize>,                           // Stored key
-    dt: u8,                                       // Delay Timer
-    st: u8,                                       // Sound Timer
-    rng: ThreadRng,                               // RNG
+    pc: u16,                     // Program Counter
+    ram: [u8; RAM_SIZE],         // RAM
+    screen: [bool; SCREEN_AREA], // Monochrome Display
+    v_reg: [u8; NUM_REGS],       // 8-bit V Registers
+    i_reg: u16,                  // 16[12]-bit I Register
+    sp: u16,                     // Stack Pointer
+    stack: [u16; STACK_SIZE],    // Stack
+    keys: [bool; NUM_KEYS],      // Keys (0-F)
+    key: Option<usize>,          // Stored key
+    dt: u8,                      // Delay Timer
+    st: u8,                      // Sound Timer
+    rng: ThreadRng,              // RNG
 }
 
 // 4-byte opcode.
@@ -247,7 +250,7 @@ impl Oxid8 {
     }
 
     /// Returns a reference to the screen.
-    pub fn screen_ref(&self) -> &[bool] {
+    pub fn screen_ref(&self) -> &[bool; SCREEN_AREA] {
         &self.screen
     }
 
