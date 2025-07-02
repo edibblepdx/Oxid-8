@@ -9,6 +9,18 @@ init().then((wasm) => {
       this.cpuInterval = 1000 / 700; // 700Hz
       this.timerInterval = 1000 / 60; // 60Hz
 
+      // Create interpreter core and load font
+      this.core = new Wasm8();
+      this.core.load_font();
+
+      // Get frame buffer
+      this.buffer = new Uint8Array(
+        wasm.memory.buffer,
+        this.core.frame.as_ptr(),
+        this.core.frame.area,
+      );
+
+      // Timers
       this.cpuTime = 0;
       this.timerTime = 0;
       this.previousRAF_ = null;
@@ -30,28 +42,19 @@ init().then((wasm) => {
         this.onWindowResize_();
       }, false);
 
-      this.setup_();
+      this.setupProgram_();
       this.raf_();
     }
 
-    setup_() {
-      // create interpreter core
-      this.core = new Wasm8();
-
-      // get framebuffer
-      this.buffer = new Uint8Array(
-        wasm.memory.buffer,
-        this.core.frame.as_ptr(),
-        this.core.frame.area,
-      );
-
+    setupProgram_() {
       this.texture = this.gl.createTexture();
       this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
 
       this.gl.texImage2D(
         this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE,
         Framebuffer.width, Framebuffer.height, 0,
-        this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, null
+        this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, 
+        this.buffer
       );
 
       this.gl.texParameteri(
@@ -126,21 +129,32 @@ init().then((wasm) => {
       let redraw = false;
       while (this.timerTime >= this.cpuInterval) {
         redraw = true;
-        this.core.dec_timers;
+        this.core.dec_timers();
         this.timerTime -= this.timerInterval;
       }
 
       if (redraw) {
         // update texture from WASM memory
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
+        this.gl.texImage2D(
+          this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE,
+          Framebuffer.width, Framebuffer.height, 0,
+          this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, 
+          this.buffer
+        );
+        /*
         this.gl.texSubImage2D(
           this.gl.TEXTURE_2D, 0, 0, 0,
           Framebuffer.width, Framebuffer.height,
-          this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, this.buffer
+          this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE,
+          this.buffer
         );
+        */
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);
       }
     }
+
+    loadROM_() {}
 
     raf_() {
       requestAnimationFrame((t) => {
@@ -154,7 +168,7 @@ init().then((wasm) => {
 
         this.gl.activeTexture(this.gl.TEXTURE0);
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
-        this.gl.uniform1i(self.uTexLoc, 0);
+        this.gl.uniform1i(this.uTexLoc, 0);
 
         this.gl.bindVertexArray(this.vao);
         this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
@@ -178,5 +192,19 @@ init().then((wasm) => {
   */
 
   let APP_ = new App();
-  APP_.initialize();
+
+  // Add ROM file loader
+  document
+    .getElementById("romInput")
+    .addEventListener("change",
+      async (event) => {
+
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const buffer = await file.arrayBuffer();
+    const romData = new Uint8Array(buffer);
+    APP_.loadROM_(romData);
+    APP_.initialize();
+  });
 });
