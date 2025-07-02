@@ -131,7 +131,13 @@ impl fmt::Display for Opcode {
 impl Oxid8 {
     /// Create a new oxid8 instance.
     pub fn new() -> Self {
-        Self::default()
+        Oxid8::default()
+    }
+
+    /// Reset all parameters.
+    /// Must reload font.
+    pub fn reset(&mut self) {
+        *self = Oxid8::default();
     }
 
     /// Emulates a single cycle.
@@ -274,6 +280,22 @@ impl Oxid8 {
 
         self.ram[START_ADDR as usize..(START_ADDR as usize + len)] //
             .copy_from_slice(rom.as_slice());
+
+        Ok(())
+    }
+
+    /// Loads a rom from byte array.
+    pub fn load_rom_as_bytes(&mut self, rom_data: &[u8]) -> io::Result<()> {
+        let len = rom_data.len();
+        if len > (RAM_SIZE - START_ADDR as usize) {
+            return Err(io::Error::new(
+                io::ErrorKind::FileTooLarge,
+                format!("ROM too large: {}", len),
+            ));
+        }
+
+        self.ram[START_ADDR as usize..(START_ADDR as usize + len)] //
+            .copy_from_slice(rom_data);
 
         Ok(())
     }
