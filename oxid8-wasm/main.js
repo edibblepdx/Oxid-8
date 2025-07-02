@@ -1,4 +1,4 @@
-import init, { Wasm8, Framebuffer } from "./pkg/oxid8_wasm.js";
+import init, { Emu, Framebuffer } from "./pkg/oxid8_wasm.js";
 import { vertexSource } from "./vertex.js";
 import { fragmentSource } from "./fragment.js";
 import { createShader, createProgram } from "./webgl-utils.js";
@@ -10,7 +10,7 @@ init().then((wasm) => {
       this.timerInterval = 1000 / 60; // 60Hz
 
       // Create interpreter core and load font
-      this.core = new Wasm8();
+      this.core = new Emu();
       this.core.load_font();
 
       // Get frame buffer
@@ -29,6 +29,10 @@ init().then((wasm) => {
     initialize() {
       this.canvas = document.getElementById('canvas');
       this.gl = this.canvas.getContext('webgl2');
+
+      //this.canvas.width = this.canvas.clientWidth * window.devicePixelRatio;
+      //this.canvas.height = this.canvas.clientHeight * window.devicePixelRatio;
+      //this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
       if (!this.gl) {
         console.error("ERROR::WEBGL2::INITIALIZATION_ERROR");
@@ -56,6 +60,10 @@ init().then((wasm) => {
         this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, 
         this.buffer
       );
+      // flip texture
+      // y-flip is deprecated so find another method
+      this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+      this.gl.generateMipmap(this.gl.TEXTURE_2D);
 
       this.gl.texParameteri(
         this.gl.TEXTURE_2D,
@@ -134,6 +142,14 @@ init().then((wasm) => {
       }
 
       if (redraw) {
+        // write to buffer
+        this.core.draw();
+        this.buffer = new Uint8Array(
+          wasm.memory.buffer,
+          this.core.frame.as_ptr(),
+          this.core.frame.area,
+        );
+
         // update texture from WASM memory
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
         this.gl.texImage2D(
@@ -142,19 +158,14 @@ init().then((wasm) => {
           this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, 
           this.buffer
         );
-        /*
-        this.gl.texSubImage2D(
-          this.gl.TEXTURE_2D, 0, 0, 0,
-          Framebuffer.width, Framebuffer.height,
-          this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE,
-          this.buffer
-        );
-        */
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);
       }
     }
 
-    loadROM_() {}
+    loadROM_(rom_data) {
+      this.core.load_rom_as_bytes(rom_data);
+      console.log(rom_data);
+    }
 
     raf_() {
       requestAnimationFrame((t) => {
@@ -163,15 +174,22 @@ init().then((wasm) => {
         }
         this.step_(t - this.previousRAF_);
 
+        // clear screen and bind shader program
         this.gl.clear(this.gl.COLOR_BUFFER_BIT);
         this.gl.useProgram(this.shaderProgram);
 
+        // bind texture
         this.gl.activeTexture(this.gl.TEXTURE0);
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
         this.gl.uniform1i(this.uTexLoc, 0);
 
+        // bind vao and draw
         this.gl.bindVertexArray(this.vao);
         this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+
+        // unbind vao and shader program
+        this.gl.bindVertexArray(null);
+        this.gl.useProgram(null);
 
         this.previousRAF_ = t;
         this.raf_();
@@ -179,8 +197,6 @@ init().then((wasm) => {
     }
   }
 
-        //this.gl.bindVertexArray(null);
-        //this.gl.useProgram(null);
 
   /*
   let APP_ = null;

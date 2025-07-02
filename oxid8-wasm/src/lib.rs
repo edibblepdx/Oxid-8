@@ -2,6 +2,12 @@ use oxid8_core::{Oxid8, SCREEN_AREA, SCREEN_HEIGHT, SCREEN_WIDTH};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
+#[wasm_bindgen]
 #[derive(Clone, Copy)]
 pub struct Framebuffer {
     buffer: [u8; SCREEN_AREA], // monochrome
@@ -44,19 +50,19 @@ impl Framebuffer {
 
 #[wasm_bindgen]
 #[derive(Default)]
-pub struct Wasm8 {
+pub struct Emu {
     pub frame: Framebuffer,
     core: Oxid8,
 }
 
 #[wasm_bindgen]
-impl Wasm8 {
+impl Emu {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        Wasm8::default()
+        Emu::default()
     }
 
-    /// Draw to the framebuffer.
+    /// Write to the framebuffer.
     pub fn draw(&mut self) {
         for (i, &p) in self.core.screen_ref().iter().enumerate() {
             self.frame.buffer[i] = if p { 255 } else { 0 };
@@ -95,7 +101,8 @@ impl Wasm8 {
 
     /// Instruct the interpreter to load a rom from filename.
     // WARN: ignoring `Result`
-    pub fn load_rom(&mut self, filename: &str) {
-        let _ = self.core.load_rom(filename);
+    pub fn load_rom_as_bytes(&mut self, rom_data: &[u8]) {
+        let _ = self.core.load_rom_as_bytes(rom_data);
+        log(&format!("{:?}", rom_data));
     }
 }
