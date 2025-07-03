@@ -63,7 +63,7 @@ impl Emu {
     }
 
     /// Write to the framebuffer.
-    pub fn draw(&mut self) {
+    pub fn draw_frame(&mut self) {
         for (i, &p) in self.core.screen_ref().iter().enumerate() {
             self.frame.buffer[i] = if p { 255 } else { 0 };
         }

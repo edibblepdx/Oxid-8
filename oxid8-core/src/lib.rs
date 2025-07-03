@@ -58,9 +58,8 @@ const START_ADDR: u16 = 0x200;
 #[derive(Debug)]
 struct Opcode(u8, u8, u8, u8);
 
-// struct Oxid8 source modified:
+// struct Oxid8 fields based on:
 // https://aquova.net/emudev/chip8/
-// All methods are original
 
 /// Oxid8
 #[derive(Debug)]
@@ -79,8 +78,9 @@ pub struct Oxid8 {
     rng: ThreadRng,              // RNG
 }
 
-// 4-byte opcode.
+/// 4-byte opcode.
 impl Opcode {
+    /// New Opcode.
     fn new(byte1: u8, byte2: u8) -> Self {
         Self(
             (byte1 & 0xF0) >> 4,
@@ -121,6 +121,7 @@ impl Opcode {
     }
 }
 
+/// Formatted as "(byte1, byte2, byte3, byte4)"
 impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}, {}, {}, {})", self.0, self.1, self.2, self.3)
@@ -134,8 +135,8 @@ impl Oxid8 {
         Oxid8::default()
     }
 
-    /// Reset all parameters.
-    /// Must reload font.
+    /// Reset all parameters to default.
+    /// Must call `load_font` to reload font.
     pub fn reset(&mut self) {
         *self = Oxid8::default();
     }
@@ -235,6 +236,7 @@ impl Oxid8 {
     }
 
     /// Returns true if sound timer is zero.
+    #[must_use]
     pub fn sound(&self) -> bool {
         self.st != 0
     }
@@ -256,6 +258,7 @@ impl Oxid8 {
     }
 
     /// Returns a reference to the screen.
+    #[must_use]
     pub fn screen_ref(&self) -> &[bool; SCREEN_AREA] {
         &self.screen
     }
@@ -300,11 +303,11 @@ impl Oxid8 {
         Ok(())
     }
 
-    // Pushes `val` onto the program stack and increments the stack pointer.
-    //
-    // # Panics
-    //
-    // `push` panics if the stack overflows.
+    /// Pushes `val` onto the program stack and increments the stack pointer.
+    ///
+    /// # Panics
+    ///
+    /// `push` panics if the stack overflows.
     fn push(&mut self, val: u16) {
         match self.sp as usize {
             0..STACK_SIZE => {
@@ -315,11 +318,11 @@ impl Oxid8 {
         };
     }
 
-    // Pops top value off the program stack and decrements the stack pointer.
-    //
-    // # Panics
-    //
-    // `pop` panics if the stack underflows.
+    /// Pops top value off the program stack and decrements the stack pointer.
+    ///
+    /// # Panics
+    ///
+    /// `pop` panics if the stack underflows.
     fn pop(&mut self) -> u16 {
         match self.sp as usize {
             1..=STACK_SIZE => {
@@ -350,151 +353,151 @@ impl Default for Oxid8 {
     }
 }
 
-// Oxid8 CPU Instructions
-// Source: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#0.1
-impl Oxid8 {
-    // Naming Conventions:
-    // -------------------
-    // n:      half-byte
-    // kk:     byte
-    // nnn:    address
-    // x,y,i:  register
-    // dt:     delay timer
-    // st:     sound timer
-    // k:      key
-    // -------------------
+// Cowgod's Chip-8 Technical Reference v1.0:
+// http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#0.1
 
-    // 00E0 - Clear the display.
+/// Oxid8 CPU Instructions
+///
+/// # Naming Conventions:
+/// - n:      half-byte
+/// - kk:     byte
+/// - nnn:    address
+/// - x,y,i:  register
+/// - dt:     delay timer
+/// - st:     sound timer
+/// - k:      key
+impl Oxid8 {
+    /// 00E0 - Clear the display.
     fn cls(&mut self) {
         self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
     }
 
-    // 00EE - Return from a subroutine.
+    /// 00EE - Return from a subroutine.
     fn ret(&mut self) {
         self.pc = self.pop();
     }
 
-    // 1nnn - Jump to location nnn.
+    /// 1nnn - Jump to location nnn.
     fn jp_nnn(&mut self, nnn: u16) {
         self.pc = nnn;
     }
 
-    // 2nnn - Call subroutine at nnn.
+    /// 2nnn - Call subroutine at nnn.
     fn call(&mut self, nnn: u16) {
         self.push(self.pc);
         self.pc = nnn;
     }
 
-    // 3xkk - Skip next instruction if Vx = kk.
+    /// 3xkk - Skip next instruction if Vx = kk.
     fn se_xkk(&mut self, x: usize, kk: u8) {
         if self.v_reg[x] == kk {
             self.pc += 2;
         }
     }
 
-    // 4xkk - Skip next instruction if Vx != kk.
+    /// 4xkk - Skip next instruction if Vx != kk.
     fn sne_xkk(&mut self, x: usize, kk: u8) {
         if self.v_reg[x] != kk {
             self.pc += 2;
         }
     }
 
-    // 5xy0 - Skip next instruction if Vx = Vy.
+    /// 5xy0 - Skip next instruction if Vx = Vy.
     fn se_xy(&mut self, x: usize, y: usize) {
         if self.v_reg[x] == self.v_reg[y] {
             self.pc += 2;
         }
     }
 
-    // 6xkk - Set Vx = kk.
+    /// 6xkk - Set Vx = kk.
     fn ld_xkk(&mut self, x: usize, kk: u8) {
         self.v_reg[x] = kk;
     }
 
-    // 7xkk - Set Vx = Vx + kk.
+    /// 7xkk - Set Vx = Vx + kk.
     fn add_xkk(&mut self, x: usize, kk: u8) {
         self.v_reg[x] = self.v_reg[x].wrapping_add(kk);
     }
 
-    // 8xy0 - Set Vx = Vy.
+    /// 8xy0 - Set Vx = Vy.
     fn ld_xy(&mut self, x: usize, y: usize) {
         self.v_reg[x] = self.v_reg[y];
     }
 
-    // 8xy1 - Set Vx = Vx OR Vy.
+    /// 8xy1 - Set Vx = Vx OR Vy.
     fn or(&mut self, x: usize, y: usize) {
         self.v_reg[x] |= self.v_reg[y];
     }
 
-    // 8xy2 - Set Vx = Vx AND Vy.
+    /// 8xy2 - Set Vx = Vx AND Vy.
     fn and(&mut self, x: usize, y: usize) {
         self.v_reg[x] &= self.v_reg[y];
     }
 
-    // 8xy3 - Set Vx = Vx XOR Vy.
+    /// 8xy3 - Set Vx = Vx XOR Vy.
     fn xor(&mut self, x: usize, y: usize) {
         self.v_reg[x] ^= self.v_reg[y];
     }
 
-    // 8xy4 - Set Vx = Vx + Vy, set VF = carry.
+    /// 8xy4 - Set Vx = Vx + Vy, set VF = carry.
     fn add_xy(&mut self, x: usize, y: usize) {
         let (vx, carry) = self.v_reg[x].overflowing_add(self.v_reg[y]);
         self.v_reg[x] = vx;
         self.v_reg[VF] = carry as u8;
     }
 
-    // 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow.
+    /// 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow.
     fn sub_xy(&mut self, x: usize, y: usize) {
         let (vx, borrow) = self.v_reg[x].overflowing_sub(self.v_reg[y]);
         self.v_reg[x] = vx;
         self.v_reg[VF] = !borrow as u8;
     }
 
-    // 8xy6 - Set Vx = Vx SHR 1.
+    /// 8xy6 - Set Vx = Vx SHR 1.
     fn shr(&mut self, x: usize, _y: usize) {
         let vx = self.v_reg[x];
         self.v_reg[x] = vx >> 1;
         self.v_reg[VF] = vx & 1;
     }
 
-    // 8xy7 - Set Vx = Vy - Vx, set VF = NOT borrow.
+    /// 8xy7 - Set Vx = Vy - Vx, set VF = NOT borrow.
     fn subn_xy(&mut self, x: usize, y: usize) {
         let (vx, borrow) = self.v_reg[y].overflowing_sub(self.v_reg[x]);
         self.v_reg[x] = vx;
         self.v_reg[VF] = !borrow as u8;
     }
 
-    // 8xyE - Set Vx = Vx SHL 1.
+    /// 8xyE - Set Vx = Vx SHL 1.
     fn shl(&mut self, x: usize, _y: usize) {
         let vx = self.v_reg[x];
         self.v_reg[x] = vx << 1;
         self.v_reg[VF] = (vx >> 7) & 1;
     }
 
-    // 9xy0 - Skip next instruction if Vx != Vy.
+    /// 9xy0 - Skip next instruction if Vx != Vy.
     fn sne_xy(&mut self, x: usize, y: usize) {
         if self.v_reg[x] != self.v_reg[y] {
             self.pc += 2;
         }
     }
 
-    // Annn - Set I = nnn.
+    /// Annn - Set I = nnn.
     fn ld_innn(&mut self, nnn: u16) {
         self.i_reg = nnn;
     }
 
-    // Bnnn - Jump to location nnn + V0.
+    /// Bnnn - Jump to location nnn + V0.
     fn jp_0nnn(&mut self, nnn: u16) {
         self.pc = nnn + self.v_reg[0] as u16;
     }
 
-    // Cxkk - Set Vx = random byte AND kk.
+    /// Cxkk - Set Vx = random byte AND kk.
     fn rnd(&mut self, x: usize, kk: u8) {
         self.v_reg[x] = self.rng.random_range(0..=0xFF) as u8 & kk;
     }
 
-    // Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
-    // set VF = collision.
+    /// Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
+    /// set VF = collision.
     fn drw(&mut self, x: usize, y: usize, n: u8) {
         // a sprite is a byte wide and n in [1,15] rows where n is an integer
         let (x, y) = (
@@ -531,26 +534,26 @@ impl Oxid8 {
         }
     }
 
-    // Ex9E - Skip next instruction if key with the value of Vx is pressed.
+    /// Ex9E - Skip next instruction if key with the value of Vx is pressed.
     fn skp(&mut self, x: usize) {
         if self.keys[self.v_reg[x] as usize] {
             self.pc += 2;
         }
     }
 
-    // ExA1 - Skip next instruction if key with the value of Vx is not pressed.
+    /// ExA1 - Skip next instruction if key with the value of Vx is not pressed.
     fn sknp(&mut self, x: usize) {
         if !self.keys[self.v_reg[x] as usize] {
             self.pc += 2;
         }
     }
 
-    // Fx07 - Set Vx = delay timer value.
+    /// Fx07 - Set Vx = delay timer value.
     fn ld_xdt(&mut self, x: usize) {
         self.v_reg[x] = self.dt;
     }
 
-    // Fx0A - Wait for a key press, store the value of the key in Vx.
+    /// Fx0A - Wait for a key press, store the value of the key in Vx.
     fn ld_xk(&mut self, x: usize) {
         match self.key {
             Some(k) => {
@@ -575,27 +578,27 @@ impl Oxid8 {
         self.pc -= 2;
     }
 
-    // Fx15 - Set delay timer = Vx.
+    /// Fx15 - Set delay timer = Vx.
     fn ld_dtx(&mut self, x: usize) {
         self.dt = self.v_reg[x];
     }
 
-    // Fx18 - Set sound timer = Vx.
+    /// Fx18 - Set sound timer = Vx.
     fn ld_stx(&mut self, x: usize) {
         self.st = self.v_reg[x];
     }
 
-    // Fx1E - Set I = I + Vx.
+    /// Fx1E - Set I = I + Vx.
     fn add_ix(&mut self, x: usize) {
         self.i_reg = self.i_reg.wrapping_add(self.v_reg[x] as u16);
     }
 
-    // Fx29 - Set I = location of sprite for digit Vx.
+    /// Fx29 - Set I = location of sprite for digit Vx.
     fn ld_fx(&mut self, x: usize) {
         self.i_reg = FONT_ADDR + (self.v_reg[x] as u16 * 5);
     }
 
-    // Fx33 - Store BCD representation of Vx in memory locations I, I+1, and I+2.
+    /// Fx33 - Store BCD representation of Vx in memory locations I, I+1, and I+2.
     fn ld_bx(&mut self, x: usize) {
         let i = self.i_reg as usize;
         let v = self.v_reg[x];
@@ -604,13 +607,13 @@ impl Oxid8 {
         self.ram[i + 2] = v % 10;
     }
 
-    // Fx55 - Store registers V0 through Vx in memory starting at location I.
+    /// Fx55 - Store registers V0 through Vx in memory starting at location I.
     fn ld_ix(&mut self, x: usize) {
         let i = self.i_reg as usize;
         self.ram[i..=(i + x)].copy_from_slice(&self.v_reg[0..=x]);
     }
 
-    // Fx65 - Read registers V0 through Vx from memory starting at location I.
+    /// Fx65 - Read registers V0 through Vx from memory starting at location I.
     fn ld_xi(&mut self, x: usize) {
         let i = self.i_reg as usize;
         self.v_reg[0..=x].copy_from_slice(&self.ram[i..=(i + x)]);

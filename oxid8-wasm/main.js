@@ -143,7 +143,7 @@ init().then((wasm) => {
 
       if (redraw) {
         // write to buffer
-        this.core.draw();
+        this.core.draw_frame();
         this.buffer = new Uint8Array(
           wasm.memory.buffer,
           this.core.frame.as_ptr(),
