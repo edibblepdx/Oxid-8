@@ -10,6 +10,8 @@
 use rand::{Rng, rng, rngs::ThreadRng};
 use std::{fmt, io, time::Duration};
 
+mod screen;
+
 /// Standard CPU tick rate set to 700Hz. This value is not used internally.
 /// Run a CPU cycle this often.
 pub const CPU_TICK: Duration = Duration::from_micros(1430);
