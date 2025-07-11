@@ -3,9 +3,12 @@
 //! `oxid8_core` is an interpreter core for the Chip-8 programming language,
 //! developed by Joseph Weisbecker in the mid-1970s for making games on the
 //! COSMAC VIP and Telmac 1800.
+//!
+//! This is the core interpreter library for `Oxid8`. So that developers can
+//! create their own renderers on top of this library crate.
 
 use rand::{Rng, rng, rngs::ThreadRng};
-use std::{fmt, fs, io, time::Duration};
+use std::{fmt, io, time::Duration};
 
 /// Standard CPU tick rate set to 700Hz. This value is not used internally.
 /// Run a CPU cycle this often.
@@ -29,6 +32,8 @@ pub const SCREEN_AREA: usize = SCREEN_WIDTH * SCREEN_HEIGHT;
 const FONTSET_SIZE: usize = 80;
 const FONT_ADDR: u16 = 0x050;
 
+// Some games may behave differently based on the font.
+// This is the most common font that I see.
 const FONTSET: [u8; FONTSET_SIZE] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -61,7 +66,7 @@ struct Opcode(u8, u8, u8, u8);
 // struct Oxid8 fields based on:
 // https://aquova.net/emudev/chip8/
 
-/// Oxid8
+/// Oxid8 Core
 #[derive(Debug)]
 pub struct Oxid8 {
     pc: u16,                     // Program Counter
@@ -72,7 +77,7 @@ pub struct Oxid8 {
     sp: u16,                     // Stack Pointer
     stack: [u16; STACK_SIZE],    // Stack
     keys: [bool; NUM_KEYS],      // Keys (0-F)
-    key: Option<usize>,          // Stored key
+    stored_key: Option<usize>,   // Stored key
     dt: u8,                      // Delay Timer
     st: u8,                      // Sound Timer
     rng: ThreadRng,              // RNG
@@ -135,6 +140,10 @@ impl Oxid8 {
         Oxid8::default()
     }
 
+    // TODO: panic hook example to reset emulator
+    // when a user uploads a bad rom so that they
+    // can try a different one.
+
     /// Reset all parameters to default.
     /// Must call `load_font` to reload font.
     pub fn reset(&mut self) {
@@ -143,14 +152,21 @@ impl Oxid8 {
 
     /// Emulates a single cycle.
     ///
+    /// # Errors
+    ///
+    /// Invalid opcodes will cause `run_cycle` to return
+    /// an error string with the full opcode and program
+    /// counter at that point. The rom is bad.
+    ///
     /// # Panics
     ///
     /// `push` and `pop` instructions can panic with a
     /// Stack Overflow/Underflow error.
     ///
-    /// Some opcodes may panic.
+    /// Other opcodes may panic if the game attempts to
+    /// perform an invalid action. Otherwise the interpreter
+    /// can be left in an invalid state. The rom is bad.
     pub fn run_cycle(&mut self) -> Result<(), String> {
-        // TODO: fix return type
         let opcode = Opcode::new(
             self.ram[self.pc as usize],     //
             self.ram[self.pc as usize + 1], //
@@ -248,7 +264,6 @@ impl Oxid8 {
     /// `set_key` panics if key is out of bounds.
     /// Expects 0x0 - 0xF (0 - 15).
     pub fn set_key(&mut self, k: usize, val: bool) {
-        // WARN: will panic if key out of bounds
         self.keys[k] = val;
     }
 
@@ -270,25 +285,23 @@ impl Oxid8 {
     }
 
     /// Loads a rom given a filename.
-    pub fn load_rom(&mut self, filename: &str) -> io::Result<()> {
-        // TODO: use pathbuf instead
-        let rom: Vec<u8> = fs::read(filename)?;
-        let len = rom.len();
-        if len > (RAM_SIZE - START_ADDR as usize) {
-            return Err(io::Error::new(
-                io::ErrorKind::FileTooLarge,
-                format!("ROM too large: {}", len),
-            ));
-        }
+    ///
+    /// # Errors
+    ///
+    /// If there is any issue loading the ROM, then an error is returned.
+    pub fn load_rom_path(&mut self, path: impl AsRef<std::path::Path>) -> io::Result<()> {
+        use std::fs;
 
-        self.ram[START_ADDR as usize..(START_ADDR as usize + len)] //
-            .copy_from_slice(rom.as_slice());
-
-        Ok(())
+        let rom_data: Vec<u8> = fs::read(path)?;
+        self.load_rom_bytes(rom_data.as_slice())
     }
 
     /// Loads a rom from byte array.
-    pub fn load_rom_as_bytes(&mut self, rom_data: &[u8]) -> io::Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// If there is any issue loading the ROM, then an error is returned.
+    pub fn load_rom_bytes(&mut self, rom_data: &[u8]) -> io::Result<()> {
         let len = rom_data.len();
         if len > (RAM_SIZE - START_ADDR as usize) {
             return Err(io::Error::new(
@@ -345,7 +358,7 @@ impl Default for Oxid8 {
             sp: 0,
             stack: [0; STACK_SIZE],
             keys: [false; NUM_KEYS],
-            key: None,
+            stored_key: None,
             dt: 0,
             st: 0,
             rng: rng(),
@@ -555,12 +568,12 @@ impl Oxid8 {
 
     /// Fx0A - Wait for a key press, store the value of the key in Vx.
     fn ld_xk(&mut self, x: usize) {
-        match self.key {
+        match self.stored_key {
             Some(k) => {
                 // Wait for key release
                 if !self.keys[k] {
                     self.v_reg[x] = k as u8;
-                    self.key = None;
+                    self.stored_key = None;
                     return;
                 }
             }
@@ -568,7 +581,7 @@ impl Oxid8 {
                 // Store key press
                 for (k, &pressed) in self.keys.iter().enumerate() {
                     if pressed {
-                        self.key = Some(k);
+                        self.stored_key = Some(k);
                         break;
                     }
                 }
@@ -704,7 +717,8 @@ mod tests {
 
     #[test]
     fn draw_basic() {
-        // just two x on top of each other 8x15
+        // Largest drawable sprite.
+        // Just two 'X' on top of each other sized 8x15.
         let sprite = [
             0x81, 0x42, 0x24, 0x18, //
             0x18, 0x24, 0x42, 0x81, //
