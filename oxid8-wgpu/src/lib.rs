@@ -8,6 +8,7 @@ use crate::app::{App, State};
 
 mod app;
 mod geometry;
+mod texture;
 
 pub fn run() -> anyhow::Result<()> {
     cfg_if! {

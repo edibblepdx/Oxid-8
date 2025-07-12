@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use crate::geometry::*;
+
 use wgpu::util::DeviceExt;
 use winit::{
     application::ApplicationHandler,
@@ -20,6 +22,10 @@ pub struct State {
     surface: wgpu::Surface<'static>,
     surface_format: wgpu::TextureFormat,
     is_surface_configured: bool,
+    render_pipeline: wgpu::RenderPipeline,
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    num_indices: u32,
 }
 
 impl State {
@@ -59,6 +65,68 @@ impl State {
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps.formats[0];
 
+        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Vertex::desc()],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: surface_format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                polygon_mode: wgpu::PolygonMode::Fill,
+                // Requires Features::DEPTH_CLIP_CONTROL
+                unclipped_depth: false,
+                // Requires Features::CONSERVATIVE_RASTERIZATION
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+            cache: None,
+        });
+
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(VERTICES),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(INDICES),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+        let num_indices = INDICES.len() as u32;
+
         let mut state = State {
             window,
             device,
@@ -67,6 +135,10 @@ impl State {
             surface,
             surface_format,
             is_surface_configured: false,
+            render_pipeline,
+            vertex_buffer,
+            index_buffer,
+            num_indices,
         };
 
         // Configure surface for the first time
@@ -119,7 +191,7 @@ impl State {
         let mut encoder = self.device.create_command_encoder(&Default::default());
         {
             // Create the renderpass which will clear the screen.
-            let _renderpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut renderpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &texture_view,
@@ -134,6 +206,11 @@ impl State {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
+
+            renderpass.set_pipeline(&self.render_pipeline);
+            renderpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            renderpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            renderpass.draw_indexed(0..self.num_indices, 0, 0..1);
         } // End the renderpass.
 
         // Submit the command in the queue to execute
@@ -245,10 +322,10 @@ impl ApplicationHandler<State> for App {
     #[allow(unused_mut)]
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: State) {
         #[cfg(target_arch = "wasm32")]
-        {
+        if !event.is_surface_configured {
             // Configure surface for the first time on web
             event.resize(event.window.inner_size());
-            // Already redraw after resizing, so this might be pointless
+            // Already redraw after resizing so this might be pointless
             event.window.request_redraw();
         }
         self.state = Some(event);
