@@ -59,7 +59,7 @@ impl State {
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps.formats[0];
 
-        Self {
+        let mut state = State {
             window,
             device,
             queue,
@@ -67,7 +67,14 @@ impl State {
             surface,
             surface_format,
             is_surface_configured: false,
-        }
+        };
+
+        // Configure surface for the first time
+        // Delay first configuration on web
+        #[cfg(not(target_arch = "wasm32"))]
+        state.configure_surface();
+
+        state
     }
 
     fn configure_surface(&mut self) {
@@ -199,7 +206,7 @@ impl ApplicationHandler<State> for App {
                 assert!(proxy.send_event(State::new(window).await).is_ok())
             });
 
-            window.request_redraw();
+            // request redraw in user_event
         }
     }
 
@@ -239,7 +246,9 @@ impl ApplicationHandler<State> for App {
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: State) {
         #[cfg(target_arch = "wasm32")]
         {
+            // Configure surface for the first time on web
             event.resize(event.window.inner_size());
+            // Already redraw after resizing, so this might be pointless
             event.window.request_redraw();
         }
         self.state = Some(event);

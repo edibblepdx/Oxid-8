@@ -16,7 +16,7 @@ wasm-opt = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-oxid8-core = { path = "../oxid8-core"}
+# oxid8-core = { path = "../oxid8-core"}
 anyhow = "1.0.98"
 winit = "0.30.11"
 env_logger = "0.11"
@@ -31,7 +31,7 @@ version = "1.23.1"
 features = [ "derive" ]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.3", features = ["wasm_js"] }
+# getrandom = { version = "0.3", features = ["wasm_js"] }
 console_error_panic_hook = "0.1.7"
 console_log = "1.0"
 wgpu = { version = "26.0.1", features = ["webgl"]}

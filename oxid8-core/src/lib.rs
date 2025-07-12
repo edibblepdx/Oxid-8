@@ -150,6 +150,34 @@ impl Oxid8 {
         *self = Oxid8::default();
     }
 
+    /// Emulates a full frame.
+    ///
+    /// Currently runs cpu cycles at 600Hz or 10 times per
+    /// frame at 60Hz.
+    ///
+    /// # Errors
+    ///
+    /// Invalid opcodes will cause `frame` to return
+    /// an error string with the full opcode and program
+    /// counter at that point. The rom is bad.
+    ///
+    /// # Panics
+    ///
+    /// `push` and `pop` instructions can panic with a
+    /// Stack Overflow/Underflow error.
+    ///
+    /// Other opcodes may panic if the game attempts to
+    /// perform an invalid action. Otherwise the interpreter
+    /// can be left in an invalid state. The rom is bad.
+    pub fn next_frame(&mut self) -> Result<(), String> {
+        for _ in 0..10 {
+            self.run_cycle()?;
+        }
+        self.dec_timers();
+
+        Ok(())
+    }
+
     /// Emulates a single cycle.
     ///
     /// # Errors
@@ -238,6 +266,7 @@ impl Oxid8 {
             },
             _ => invalid()?,
         }
+
         Ok(())
     }
 
