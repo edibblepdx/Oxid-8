@@ -14,7 +14,7 @@ use winit::{
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-pub struct State {
+pub struct WgpuContext {
     window: Arc<Window>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -28,7 +28,7 @@ pub struct State {
     num_indices: u32,
 }
 
-impl State {
+impl WgpuContext {
     async fn new(window: Arc<Window>) -> Self {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             #[cfg(not(target_arch = "wasm32"))]
@@ -127,7 +127,7 @@ impl State {
         });
         let num_indices = INDICES.len() as u32;
 
-        let mut state = State {
+        let mut ctx = WgpuContext {
             window,
             device,
             queue,
@@ -144,9 +144,9 @@ impl State {
         // Configure surface for the first time
         // Delay first configuration on web
         #[cfg(not(target_arch = "wasm32"))]
-        state.configure_surface();
+        ctx.configure_surface();
 
-        state
+        ctx
     }
 
     fn configure_surface(&mut self) {
@@ -222,26 +222,26 @@ impl State {
 
 pub struct App {
     #[cfg(target_arch = "wasm32")]
-    proxy: Option<winit::event_loop::EventLoopProxy<State>>,
-    state: Option<State>,
+    proxy: Option<winit::event_loop::EventLoopProxy<WgpuContext>>,
+    ctx: Option<WgpuContext>,
 }
 
 impl App {
     pub fn new(
         // With proxy on target wasm32
-        #[cfg(target_arch = "wasm32")] event_loop: &EventLoop<State>,
+        #[cfg(target_arch = "wasm32")] event_loop: &EventLoop<WgpuContext>,
     ) -> Self {
         #[cfg(target_arch = "wasm32")]
         let proxy = Some(event_loop.create_proxy());
         Self {
             #[cfg(target_arch = "wasm32")]
             proxy,
-            state: None,
+            ctx: None,
         }
     }
 }
 
-impl ApplicationHandler<State> for App {
+impl ApplicationHandler<WgpuContext> for App {
     /// Emitted when the application has been resumed.
     /// Initialize graphics context and create a window after first resumed event.
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -271,8 +271,8 @@ impl ApplicationHandler<State> for App {
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let state = pollster::block_on(State::new(window.clone()));
-            self.state = Some(state);
+            let ctx = pollster::block_on(WgpuContext::new(window.clone()));
+            self.ctx = Some(ctx);
 
             window.request_redraw();
         }
@@ -280,7 +280,7 @@ impl ApplicationHandler<State> for App {
         #[cfg(target_arch = "wasm32")]
         if let Some(proxy) = self.proxy.take() {
             wasm_bindgen_futures::spawn_local(async move {
-                assert!(proxy.send_event(State::new(window).await).is_ok())
+                assert!(proxy.send_event(WgpuContext::new(window).await).is_ok())
             });
 
             // request redraw in user_event
@@ -294,7 +294,7 @@ impl ApplicationHandler<State> for App {
         _window_id: WindowId,
         event: WindowEvent,
     ) {
-        let state = match self.state.as_mut() {
+        let ctx = match self.ctx.as_mut() {
             Some(canvas) => canvas,
             None => return,
         };
@@ -305,14 +305,14 @@ impl ApplicationHandler<State> for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                state.render();
+                ctx.render();
                 // Emits a new redraw requested event.
-                state.window.request_redraw();
+                ctx.window.request_redraw();
             }
             WindowEvent::Resized(size) => {
                 // Reconfigures the size of the surface. We do not re-render
                 // here as this event is always followed up by redraw request.
-                state.resize(size);
+                ctx.resize(size);
             }
             _ => (),
         }
@@ -320,7 +320,7 @@ impl ApplicationHandler<State> for App {
 
     /// Emitted when an event is sent from EventLoopProxy::send_event.
     #[allow(unused_mut)]
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: State) {
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: WgpuContext) {
         #[cfg(target_arch = "wasm32")]
         if !event.is_surface_configured {
             // Configure surface for the first time on web
@@ -328,6 +328,6 @@ impl ApplicationHandler<State> for App {
             // Already redraw after resizing so this might be pointless
             event.window.request_redraw();
         }
-        self.state = Some(event);
+        self.ctx = Some(event);
     }
 }
