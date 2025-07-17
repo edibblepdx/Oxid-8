@@ -6,14 +6,16 @@ authors = ["Ethan Dibble <edibble@pdx.edu>"]
 description = "WASM bindings for oxid8-core."
 repository = "https://github.com/edibblepdx/Oxid-8"
 license = "MIT"
-
-[workspace]
+publish = false
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+strip = true # WASM size optimization
 
 [dependencies]
 oxid8-core = { path = "../oxid8-core"}
