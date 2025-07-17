@@ -1,13 +1,14 @@
 # `Oxid-8`
 
+Oxid-8 is a Chip-8 interpreter written in rust and drawn to the terminal using `ratatui` as well as windowed natively and in the web with `wgpu`.
+
+![oxid-tetris](https://github.com/user-attachments/assets/ab1f3bdc-4ab0-48f8-8563-1ee89c436e90)
+
 ```
 ▄▄▄▄              ▄▄▄▄
 █  █ ▜▄▛ █ █▀▄ ▄▄ █▄▄█
 █▄▄█ █ █ █ █▄▀    █▄▄█
 ```
-is a Chip-8 interpreter written in rust and drawn to the terminal using `ratatui` as well as windowed natively and in the web with `wgpu`.
-
-![oxid-tetris](https://github.com/user-attachments/assets/ab1f3bdc-4ab0-48f8-8563-1ee89c436e90)
 
 ## Implementations
 
