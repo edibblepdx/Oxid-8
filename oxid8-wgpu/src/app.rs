@@ -14,8 +14,8 @@ use wgpu::util::DeviceExt;
 use winit::{
     application::ApplicationHandler,
     event::*,
-    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
-    keyboard::{KeyCode, PhysicalKey},
+    event_loop::{ActiveEventLoop, EventLoop},
+    //keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
 };
 
@@ -34,6 +34,8 @@ pub struct WgpuContext {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
+    texture_bind_group: wgpu::BindGroup,
+    pub texture: Texture,
 }
 
 impl WgpuContext {
@@ -73,12 +75,52 @@ impl WgpuContext {
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps.formats[0];
 
+        let texture = Texture::new(&device).unwrap();
+
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("texture_bind_group_layout"),
+            });
+
+        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &texture_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&texture.sampler),
+                },
+            ],
+            label: Some("diffuse_bind_group"),
+        });
+
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[],
+                bind_group_layouts: &[&texture_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -147,6 +189,8 @@ impl WgpuContext {
             vertex_buffer,
             index_buffer,
             num_indices,
+            texture_bind_group,
+            texture,
         };
 
         // Configure surface for the first time
@@ -216,6 +260,7 @@ impl WgpuContext {
             });
 
             renderpass.set_pipeline(&self.render_pipeline);
+            renderpass.set_bind_group(0, &self.texture_bind_group, &[]);
             renderpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             renderpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             renderpass.draw_indexed(0..self.num_indices, 0, 0..1);
@@ -232,7 +277,6 @@ pub enum State {
     Suspended,
     Resumed {
         emu: Oxid8,
-        texture: Texture,
         last_frame: Option<Instant>,
     },
 }
@@ -263,16 +307,18 @@ impl App {
     pub fn resume(&mut self, rom_path: PathBuf) {
         if let Some(ctx) = &self.ctx {
             let mut emu = Oxid8::default();
-            let texture = Texture::new(&ctx.device, &ctx.queue, emu.screen_ref()).unwrap();
+            ctx.texture.update(&ctx.queue, emu.screen_ref());
 
             emu.load_font();
 
+            // WARN: what to do if this fails?
             if emu.load_rom_path(&rom_path).is_ok() {
                 self.state = State::Resumed {
                     emu,
-                    texture,
                     last_frame: None,
-                }
+                };
+                // WARN: test
+                println!("rom loaded");
             }
         }
     }
@@ -309,14 +355,23 @@ impl ApplicationHandler<UserEvent> for App {
 
         #[cfg(not(target_arch = "wasm32"))]
         {
+            // Create WgpuContext
             let ctx = pollster::block_on(WgpuContext::new(window.clone()));
             self.ctx = Some(ctx);
+
+            // Set App state to Resumed
+            assert!(
+                self.proxy
+                    .send_event(UserEvent::Resumed(self.config.rom_path.clone()))
+                    .is_ok()
+            );
 
             window.request_redraw();
         }
 
         #[cfg(target_arch = "wasm32")]
         {
+            // Create WgpuContext
             let proxy = self.proxy.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 assert!(
@@ -355,15 +410,12 @@ impl ApplicationHandler<UserEvent> for App {
                 match &mut self.state {
                     Suspended => (),
                     Resumed {
-                        emu,
-                        texture,
-                        last_frame,
-                        ..
+                        emu, last_frame, ..
                     } => {
                         *last_frame = Some(Instant::now());
                         if emu.next_frame().is_ok() {
                             // Update texture
-                            texture.update(&ctx.queue, emu.screen_ref());
+                            ctx.texture.update(&ctx.queue, emu.screen_ref());
                         }
                     }
                 }

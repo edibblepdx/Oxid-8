@@ -13,7 +13,7 @@ pub struct Texture {
 }
 
 impl Texture {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, bytes: &[bool]) -> Result<Self> {
+    pub fn new(device: &wgpu::Device) -> Result<Self> {
         let size = wgpu::Extent3d {
             width: SCREEN_WIDTH as u32,
             height: SCREEN_HEIGHT as u32,
@@ -37,7 +37,7 @@ impl Texture {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
+            mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
@@ -49,7 +49,6 @@ impl Texture {
             sampler,
             size,
         };
-        tx.update(queue, bytes);
 
         Ok(tx)
     }

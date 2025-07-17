@@ -4,7 +4,6 @@ use oxid8_wgpu::{Config, run};
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-#[derive(Default)]
 pub struct Args {
     #[arg(required = true)]
     rom_path: String,
@@ -13,7 +12,7 @@ pub struct Args {
 impl Into<Config> for Args {
     fn into(self) -> Config {
         Config {
-            rom_path: self.rom_path,
+            rom_path: self.rom_path.into(),
         }
     }
 }

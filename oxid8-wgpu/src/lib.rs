@@ -1,4 +1,5 @@
 use cfg_if::cfg_if;
+use std::path::PathBuf;
 use winit::event_loop::EventLoop;
 
 #[cfg(target_arch = "wasm32")]
@@ -13,7 +14,7 @@ mod texture;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub struct Config {
-    pub rom_path: String,
+    pub rom_path: PathBuf,
 }
 
 pub fn run(#[cfg(not(target_arch = "wasm32"))] config: Config) -> anyhow::Result<()> {
