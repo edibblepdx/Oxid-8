@@ -13,12 +13,7 @@ pub struct Texture {
 }
 
 impl Texture {
-    pub fn new(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        bytes: &[bool],
-        label: Option<&str>,
-    ) -> Result<Self> {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, bytes: &[bool]) -> Result<Self> {
         let size = wgpu::Extent3d {
             width: SCREEN_WIDTH as u32,
             height: SCREEN_HEIGHT as u32,
@@ -26,7 +21,7 @@ impl Texture {
         };
         #[rustfmt::skip]
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label,
+            label: None,
             size,
             mip_level_count: 1,
             sample_count: 1,

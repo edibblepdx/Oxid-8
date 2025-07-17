@@ -1,7 +1,14 @@
-use std::sync::Arc;
+use std::{
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
+use crate::event::*;
 use crate::geometry::*;
+use crate::texture::*;
 
+use oxid8_core::Oxid8;
 use wgpu::util::DeviceExt;
 use winit::{
     application::ApplicationHandler,
@@ -220,28 +227,49 @@ impl WgpuContext {
     }
 }
 
+pub enum State {
+    Suspended,
+    Resumed {
+        emu: Oxid8,
+        last_frame: Option<Instant>,
+        rom_path: PathBuf,
+        texture: Texture,
+    },
+}
+
 pub struct App {
-    #[cfg(target_arch = "wasm32")]
-    proxy: Option<winit::event_loop::EventLoopProxy<WgpuContext>>,
+    proxy: winit::event_loop::EventLoopProxy<UserEvent>,
     ctx: Option<WgpuContext>,
+    state: State,
 }
 
 impl App {
-    pub fn new(
-        // With proxy on target wasm32
-        #[cfg(target_arch = "wasm32")] event_loop: &EventLoop<WgpuContext>,
-    ) -> Self {
-        #[cfg(target_arch = "wasm32")]
-        let proxy = Some(event_loop.create_proxy());
+    pub fn new(event_loop: &EventLoop<UserEvent>) -> Self {
         Self {
-            #[cfg(target_arch = "wasm32")]
-            proxy,
+            proxy: event_loop.create_proxy(),
             ctx: None,
+            state: State::Suspended,
         }
+    }
+
+    pub fn resume(&mut self) {
+        /*
+            //
+            // Need to create emulator
+            // Use that blank screen to create a texture
+            // Set last frame to now (or None)
+            // Rom path can be an argument since that will be when resumed
+            //
+            self.state = State::Resumed {
+                texture
+                ..Default::default()
+            }
+        }
+        */
     }
 }
 
-impl ApplicationHandler<WgpuContext> for App {
+impl ApplicationHandler<UserEvent> for App {
     /// Emitted when the application has been resumed.
     /// Initialize graphics context and create a window after first resumed event.
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -263,10 +291,11 @@ impl ApplicationHandler<WgpuContext> for App {
         }
 
         // Create window object
+        #[rustfmt::skip]
         let window = Arc::new(
             event_loop
-                .create_window(window_attributes) //
-                .unwrap(), //
+                .create_window(window_attributes)
+                .unwrap(),
         );
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -278,9 +307,14 @@ impl ApplicationHandler<WgpuContext> for App {
         }
 
         #[cfg(target_arch = "wasm32")]
-        if let Some(proxy) = self.proxy.take() {
+        {
+            let proxy = self.proxy.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                assert!(proxy.send_event(WgpuContext::new(window).await).is_ok())
+                assert!(
+                    proxy.send_event(
+                        UserEvent::ContextCreated(WgpuContext::new(window).await).is_ok()
+                    )
+                )
             });
 
             // request redraw in user_event
@@ -305,6 +339,24 @@ impl ApplicationHandler<WgpuContext> for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
+                use State::*;
+
+                match &mut self.state {
+                    Suspended => (),
+                    Resumed {
+                        emu,
+                        last_frame,
+                        texture,
+                        ..
+                    } => {
+                        *last_frame = Some(Instant::now());
+                        if emu.next_frame().is_ok() {
+                            // Update texture
+                            texture.update(&ctx.queue, emu.screen_ref());
+                        }
+                    }
+                }
+                // TODO: move this into Resumed when done testing
                 ctx.render();
                 // Emits a new redraw requested event.
                 ctx.window.request_redraw();
@@ -320,14 +372,21 @@ impl ApplicationHandler<WgpuContext> for App {
 
     /// Emitted when an event is sent from EventLoopProxy::send_event.
     #[allow(unused_mut)]
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: WgpuContext) {
-        #[cfg(target_arch = "wasm32")]
-        if !event.is_surface_configured {
-            // Configure surface for the first time on web
-            event.resize(event.window.inner_size());
-            // Already redraw after resizing so this might be pointless
-            event.window.request_redraw();
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: UserEvent) {
+        use UserEvent::*;
+
+        match event {
+            #[cfg(target_arch = "wasm32")]
+            ContextCreated(ctx) => {
+                if !event.is_surface_configured {
+                    // Configure surface for the first time on web
+                    event.resize(event.window.inner_size());
+                    // Already redraw after resizing so this might be pointless
+                    event.window.request_redraw();
+                }
+                self.ctx = Some(ctx);
+            }
+            Resumed(rom_path) => (),
         }
-        self.ctx = Some(event);
     }
 }

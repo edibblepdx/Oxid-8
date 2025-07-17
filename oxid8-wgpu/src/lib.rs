@@ -4,9 +4,10 @@ use winit::event_loop::EventLoop;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use crate::app::{App, WgpuContext};
+use crate::{app::App, event::UserEvent};
 
 mod app;
+mod event;
 mod geometry;
 mod texture;
 
@@ -19,11 +20,8 @@ pub fn run() -> anyhow::Result<()> {
         }
     }
 
-    let event_loop = EventLoop::<WgpuContext>::with_user_event().build()?;
-    let mut app = App::new(
-        #[cfg(target_arch = "wasm32")]
-        &event_loop,
-    );
+    let event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
+    let mut app = App::new(&event_loop);
 
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
