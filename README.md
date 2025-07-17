@@ -17,7 +17,7 @@ Oxid-8 is a Chip-8 interpreter written in rust and drawn to the terminal using `
 - `Oxid8-wgpu` renders natively and soon to be in the web.
     > Native requires a positional argument as the rom path.
 - `Oxid8-wasm` will likely be removed soon.
-- `Oxid8-core` is the library crate that is used by `Oxid8` and `Oxid8-wgpu`.
+- [`Oxid8-core`][oxid8-core] is the library crate that is used by `Oxid8` and `Oxid8-wgpu`.
 
 ## Terminals that support the Kitty Keyboard Protocol 
 
@@ -51,3 +51,4 @@ This project is licensed under the [MIT License][License].
 
 [License]: ./LICENSE
 [Kitty Protocol]: https://sw.kovidgoyal.net/kitty/keyboard-protocol/
+[oxid8-core]: https://crates.io/crates/oxid8-core
