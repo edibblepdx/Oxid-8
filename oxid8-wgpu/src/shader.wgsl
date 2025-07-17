@@ -34,7 +34,7 @@ var s_diffuse: sampler;
 
 fn box_blur(uv: vec2<f32>) -> vec3<f32> {
     var boxBlurColor: vec3<f32> = vec3<f32>(0.0);
-    let kernelSize: i32 = 4;
+    let kernelSize: i32 = 3;
     let texelSize: vec2<f32> = 0.05 / vec2<f32>(64.0, 32.0);
     let boxBlurDivisor: f32 = pow(f32(2 * kernelSize + 1), 2.0);
     for (var i: i32 = -kernelSize; i <= kernelSize; i++) {
@@ -68,8 +68,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         color = vec3(0.0);
     } else {
         color = box_blur(uv);
-        color = color * 0.9; // Darken white pixels
-        color = mix(color, vec3<f32>(0.1, 0.2, 0.8), 0.3);
+        //color = color * 0.9; // Darken white pixels
+        //color = textureSample(t_diffuse, s_diffuse, uv).rgb;
+        color = mix(color, vec3<f32>(0.05, 0.1, 0.55), 0.45);
     }
 
     return vec4<f32>(color, 1.0);

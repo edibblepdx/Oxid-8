@@ -1,12 +1,8 @@
-use std::{
-    path::PathBuf,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{path::PathBuf, sync::Arc, time::Instant};
 
 use crate::{Config, event::UserEvent, wgpu_context::WgpuContext};
 
-use oxid8_core::Oxid8;
+use oxid8_core::{Oxid8, TIMER_TICK};
 use winit::{
     application::ApplicationHandler,
     event::*,
@@ -178,19 +174,22 @@ impl ApplicationHandler<UserEvent> for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                match &mut self.state {
-                    State::Suspended => (),
-                    State::Resumed {
-                        emu, last_frame, ..
-                    } => {
-                        *last_frame = Some(Instant::now());
-                        if emu.next_frame().is_ok() {
-                            // Update texture
-                            ctx.texture.update(&ctx.queue, emu.screen_ref());
+                if let State::Resumed {
+                    emu, last_frame, ..
+                } = &mut self.state
+                {
+                    match last_frame {
+                        Some(last) if last.elapsed() >= TIMER_TICK => {
+                            *last_frame = Some(Instant::now());
+                            if emu.next_frame().is_ok() {
+                                // Update texture
+                                ctx.texture.update(&ctx.queue, emu.screen_ref());
+                            }
                         }
+                        None => *last_frame = Some(Instant::now()),
+                        _ => (),
                     }
                 }
-                // TODO: move this into Resumed when done testing
                 ctx.render();
                 // Emits a new redraw requested event.
                 ctx.window.request_redraw();
