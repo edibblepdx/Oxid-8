@@ -11,6 +11,7 @@ mod app;
 mod event;
 mod geometry;
 mod texture;
+mod wgpu_context;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub struct Config {
