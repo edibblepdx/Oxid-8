@@ -5,7 +5,7 @@
 █  █ ▜▄▛ █ █▀▄ ▄▄ █▄▄█
 █▄▄█ █ █ █ █▄▀    █▄▄█
 ```
-is a Chip-8 interpreter written in rust and drawn to the terminal using `ratatui`.
+is a Chip-8 interpreter written in rust and drawn to the terminal using `ratatui` as well as windowed natively and in the web with `wgpu`.
 
 ![oxid-tetris](https://github.com/user-attachments/assets/ab1f3bdc-4ab0-48f8-8563-1ee89c436e90)
 
@@ -33,15 +33,16 @@ Non-kitty terminals are supported by clearing the virtual keyboard after each cy
 
 ## Sound
 
-Sound is played by printing the bell character `\x07`. If you don't hear anything when you are expecting to, it's possible that you may have muted the bell (I don't blame you).
+Sound in the tui is played by printing the bell character `\x07`. If you don't hear anything when you are expecting to, it's possible that you may have muted the bell.
 
 ## TODO
 
-- menus
-- wasm version
-- would like to make a neat shader
-- debug to step through instructions
+- merge tui renderer into main app
+- fix web renderer
+- chromatic abberation effect
+- debug mode
 - super chip-8 extension
+- wgpu sound
 
 ## License
 
