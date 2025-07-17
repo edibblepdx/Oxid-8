@@ -11,7 +11,12 @@ mod event;
 mod geometry;
 mod texture;
 
-pub fn run() -> anyhow::Result<()> {
+#[cfg(not(target_arch = "wasm32"))]
+pub struct Config {
+    pub rom_path: String,
+}
+
+pub fn run(#[cfg(not(target_arch = "wasm32"))] config: Config) -> anyhow::Result<()> {
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             console_log::init_with_level(log::Level::Info).unwrap_throw();
@@ -21,7 +26,11 @@ pub fn run() -> anyhow::Result<()> {
     }
 
     let event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
-    let mut app = App::new(&event_loop);
+    let mut app = App::new(
+        &event_loop,
+        #[cfg(not(target_arch = "wasm32"))]
+        config,
+    );
 
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {

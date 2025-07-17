@@ -4,6 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::Config;
 use crate::event::*;
 use crate::geometry::*;
 use crate::texture::*;
@@ -231,9 +232,8 @@ pub enum State {
     Suspended,
     Resumed {
         emu: Oxid8,
-        last_frame: Option<Instant>,
-        rom_path: PathBuf,
         texture: Texture,
+        last_frame: Option<Instant>,
     },
 }
 
@@ -241,31 +241,40 @@ pub struct App {
     proxy: winit::event_loop::EventLoopProxy<UserEvent>,
     ctx: Option<WgpuContext>,
     state: State,
+    #[cfg(not(target_arch = "wasm32"))]
+    config: Config,
 }
 
 impl App {
-    pub fn new(event_loop: &EventLoop<UserEvent>) -> Self {
+    pub fn new(
+        event_loop: &EventLoop<UserEvent>,
+        #[cfg(not(target_arch = "wasm32"))] config: Config,
+    ) -> Self {
         Self {
             proxy: event_loop.create_proxy(),
             ctx: None,
             state: State::Suspended,
+            #[cfg(not(target_arch = "wasm32"))]
+            config,
         }
     }
 
-    pub fn resume(&mut self) {
-        /*
-            //
-            // Need to create emulator
-            // Use that blank screen to create a texture
-            // Set last frame to now (or None)
-            // Rom path can be an argument since that will be when resumed
-            //
-            self.state = State::Resumed {
-                texture
-                ..Default::default()
+    // WARN: check this implementation
+    pub fn resume(&mut self, rom_path: PathBuf) {
+        if let Some(ctx) = &self.ctx {
+            let mut emu = Oxid8::default();
+            let texture = Texture::new(&ctx.device, &ctx.queue, emu.screen_ref()).unwrap();
+
+            emu.load_font();
+
+            if emu.load_rom_path(&rom_path).is_ok() {
+                self.state = State::Resumed {
+                    emu,
+                    texture,
+                    last_frame: None,
+                }
             }
         }
-        */
     }
 }
 
@@ -319,6 +328,8 @@ impl ApplicationHandler<UserEvent> for App {
 
             // request redraw in user_event
         }
+
+        // TODO: Load rom from config or on wasm spawn thread local
     }
 
     /// Emitted when the OS sends an event to a winit window.
@@ -345,8 +356,8 @@ impl ApplicationHandler<UserEvent> for App {
                     Suspended => (),
                     Resumed {
                         emu,
-                        last_frame,
                         texture,
+                        last_frame,
                         ..
                     } => {
                         *last_frame = Some(Instant::now());
@@ -386,7 +397,7 @@ impl ApplicationHandler<UserEvent> for App {
                 }
                 self.ctx = Some(ctx);
             }
-            Resumed(rom_path) => (),
+            Resumed(rom_path) => self.resume(rom_path),
         }
     }
 }
