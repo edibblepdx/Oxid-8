@@ -11,7 +11,7 @@ use winit::{
     application::ApplicationHandler,
     event::*,
     event_loop::{ActiveEventLoop, EventLoop},
-    //keyboard::{KeyCode, PhysicalKey},
+    keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
 };
 
@@ -24,6 +24,34 @@ pub enum State {
         emu: Oxid8,
         last_frame: Option<Instant>,
     },
+}
+
+impl State {
+    pub fn handle_key(&mut self, key_code: KeyCode, val: bool) {
+        use KeyCode::*;
+
+        if let State::Resumed { emu, .. } = self {
+            match key_code {
+                Digit1 => emu.set_key(0x1, val),
+                Digit2 => emu.set_key(0x2, val),
+                Digit3 => emu.set_key(0x3, val),
+                Digit4 => emu.set_key(0xC, val),
+                KeyQ => emu.set_key(0x4, val),
+                KeyW => emu.set_key(0x5, val),
+                KeyE => emu.set_key(0x6, val),
+                KeyR => emu.set_key(0xD, val),
+                KeyA => emu.set_key(0x7, val),
+                KeyS => emu.set_key(0x8, val),
+                KeyD => emu.set_key(0x9, val),
+                KeyF => emu.set_key(0xE, val),
+                KeyZ => emu.set_key(0xA, val),
+                KeyX => emu.set_key(0x0, val),
+                KeyC => emu.set_key(0xB, val),
+                KeyV => emu.set_key(0xF, val),
+                _ => (),
+            }
+        }
+    }
 }
 
 pub struct App {
@@ -150,11 +178,9 @@ impl ApplicationHandler<UserEvent> for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                use State::*;
-
                 match &mut self.state {
-                    Suspended => (),
-                    Resumed {
+                    State::Suspended => (),
+                    State::Resumed {
                         emu, last_frame, ..
                     } => {
                         *last_frame = Some(Instant::now());
@@ -174,6 +200,21 @@ impl ApplicationHandler<UserEvent> for App {
                 // here as this event is always followed up by redraw request.
                 ctx.resize(size);
             }
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(key_code),
+                        state,
+                        ..
+                    },
+                ..
+            } => match &mut self.state {
+                State::Suspended => (),
+                State::Resumed { .. } => match state {
+                    ElementState::Pressed => self.state.handle_key(key_code, true),
+                    ElementState::Released => self.state.handle_key(key_code, false),
+                },
+            },
             _ => (),
         }
     }
