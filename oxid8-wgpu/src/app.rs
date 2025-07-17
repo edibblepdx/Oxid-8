@@ -187,7 +187,7 @@ impl ApplicationHandler<UserEvent> for App {
                             }
                         }
                         None => *last_frame = Some(Instant::now()),
-                        _ => (),
+                        _ => (), // This case is necessary.
                     }
                 }
                 ctx.render();
@@ -207,13 +207,15 @@ impl ApplicationHandler<UserEvent> for App {
                         ..
                     },
                 ..
-            } => match &mut self.state {
-                State::Suspended => (),
-                State::Resumed { .. } => match state {
-                    ElementState::Pressed => self.state.handle_key(key_code, true),
-                    ElementState::Released => self.state.handle_key(key_code, false),
-                },
-            },
+            } => {
+                if let State::Resumed { .. } = &mut self.state {
+                    // match key state
+                    match state {
+                        ElementState::Pressed => self.state.handle_key(key_code, true),
+                        ElementState::Released => self.state.handle_key(key_code, false),
+                    }
+                }
+            }
             _ => (),
         }
     }
