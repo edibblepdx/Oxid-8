@@ -28,6 +28,7 @@ pub fn run(#[cfg(not(target_arch = "wasm32"))] config: Config) -> anyhow::Result
     }
 
     let event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
+    #[allow(unused_mut)]
     let mut app = App::new(
         &event_loop,
         #[cfg(not(target_arch = "wasm32"))]

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{geometry::*, texture::Texture};
 
+use anyhow::Result;
 use wgpu::util::DeviceExt;
 use winit::{
     //keyboard::{KeyCode, PhysicalKey},
@@ -12,12 +13,12 @@ pub struct WgpuContext {
     pub(crate) window: Arc<Window>,
     pub(crate) queue: wgpu::Queue,
     pub(crate) texture: Texture,
+    pub(crate) is_surface_configured: bool,
 
     device: wgpu::Device,
     size: winit::dpi::PhysicalSize<u32>,
     surface: wgpu::Surface<'static>,
     surface_format: wgpu::TextureFormat,
-    is_surface_configured: bool,
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -26,7 +27,7 @@ pub struct WgpuContext {
 }
 
 impl WgpuContext {
-    pub async fn new(window: Arc<Window>) -> Self {
+    pub async fn new(window: Arc<Window>) -> Result<Self> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             #[cfg(not(target_arch = "wasm32"))]
             backends: wgpu::Backends::PRIMARY,
@@ -164,6 +165,7 @@ impl WgpuContext {
         });
         let num_indices = INDICES.len() as u32;
 
+        #[allow(unused_mut)]
         let mut ctx = WgpuContext {
             window,
             device,
@@ -185,7 +187,7 @@ impl WgpuContext {
         #[cfg(not(target_arch = "wasm32"))]
         ctx.configure_surface();
 
-        ctx
+        Ok(ctx)
     }
 
     fn configure_surface(&mut self) {

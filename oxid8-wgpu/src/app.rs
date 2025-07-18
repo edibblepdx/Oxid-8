@@ -1,6 +1,8 @@
 use std::{path::PathBuf, sync::Arc, time::Instant};
 
-use crate::{Config, event::UserEvent, wgpu_context::WgpuContext};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::Config;
+use crate::{event::UserEvent, wgpu_context::WgpuContext};
 
 use oxid8_core::{Oxid8, TIMER_TICK};
 use winit::{
@@ -125,7 +127,7 @@ impl ApplicationHandler<UserEvent> for App {
         #[cfg(not(target_arch = "wasm32"))]
         {
             // Create WgpuContext
-            let ctx = pollster::block_on(WgpuContext::new(window.clone()));
+            let ctx = pollster::block_on(WgpuContext::new(window.clone())).unwrap();
             self.ctx = Some(ctx);
 
             // Set App state to Resumed
@@ -144,9 +146,13 @@ impl ApplicationHandler<UserEvent> for App {
             let proxy = self.proxy.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 assert!(
-                    proxy.send_event(
-                        UserEvent::ContextCreated(WgpuContext::new(window).await).is_ok()
-                    )
+                    proxy
+                        .send_event(UserEvent::ContextCreated(
+                            WgpuContext::new(window)
+                                .await
+                                .expect("Failed to create window.")
+                        ))
+                        .is_ok()
                 )
             });
 
@@ -227,12 +233,12 @@ impl ApplicationHandler<UserEvent> for App {
 
         match event {
             #[cfg(target_arch = "wasm32")]
-            ContextCreated(ctx) => {
-                if !event.is_surface_configured {
+            ContextCreated(mut ctx) => {
+                if !ctx.is_surface_configured {
                     // Configure surface for the first time on web
-                    event.resize(event.window.inner_size());
+                    ctx.resize(ctx.window.inner_size());
                     // Already redraw after resizing so this might be pointless
-                    event.window.request_redraw();
+                    ctx.window.request_redraw();
                 }
                 self.ctx = Some(ctx);
             }
