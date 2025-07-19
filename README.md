@@ -12,12 +12,14 @@ Oxid-8 is a Chip-8 interpreter written in rust and drawn to the terminal using `
 
 ## Implementations
 
-- `Oxid8` renders to the terminal.
+- `Oxid8` renders to the terminal using ratatui.
     > Inside `src/bin` is `oxid-cli`—a lighter version without a menu and useful for testing. You can load a ROM by passing its path as the first command-line argument (all others will be discarded). If no arguments are given, it will fallback to an `OXID_ROM` environment variable if set; it's recommended to use `realpath` with environment variables. This will be moved into the main `Oxid8` eventually.
-- `Oxid8-wgpu` renders natively and soon to be in the web.
+- `Oxid8-wgpu` renders to a window both natively and in the web.
     > Native requires a positional argument as the rom path.
 - `Oxid8-wasm` will likely be removed soon.
+    > Replaced by Oxid8-wgpu.
 - [`Oxid8-core`][oxid8-core] is the library crate that is used by `Oxid8` and `Oxid8-wgpu`.
+    > Not currently stable, but it is intended for people to use in their own projects. Feel free to use `Oxid8` and `Oxid8-wgpu` as examples.
 
 ## Terminals that support the Kitty Keyboard Protocol 
 
