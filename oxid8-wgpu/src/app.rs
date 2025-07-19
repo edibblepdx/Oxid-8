@@ -115,7 +115,7 @@ impl App {
             match rom_source {
                 // Native
                 RomSource::Path(path) => {
-                    if emu.load_rom_path(&path).is_ok() {
+                    if emu.load_rom(&path).is_ok() {
                         self.state = State::Resumed {
                             emu,
                             last_frame: None,

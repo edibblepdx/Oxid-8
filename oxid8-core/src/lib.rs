@@ -318,7 +318,7 @@ impl Oxid8 {
     /// # Errors
     ///
     /// If there is any issue loading the ROM, then an error is returned.
-    pub fn load_rom_path(&mut self, path: impl AsRef<std::path::Path>) -> io::Result<()> {
+    pub fn load_rom(&mut self, path: impl AsRef<std::path::Path>) -> io::Result<()> {
         use std::fs;
 
         let rom_data: Vec<u8> = fs::read(path)?;
