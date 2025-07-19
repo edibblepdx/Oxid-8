@@ -259,8 +259,7 @@ impl ApplicationHandler<UserEvent> for App {
 
                 // Install input event handler to upload roms on web
                 use wasm_bindgen::JsCast;
-                use web_sys::HtmlInputElement;
-                use winit::platform::web::WindowAttributesExtWebSys;
+                use web_sys::{FileReader, HtmlInputElement, js_sys::Uint8Array};
 
                 const INPUT_ID: &str = "input";
 
@@ -271,10 +270,40 @@ impl ApplicationHandler<UserEvent> for App {
                 };
                 let html_input_element = input.unchecked_into::<HtmlInputElement>();
 
+                // TODO: Handle the Err variants
+
+                // Input onchange handler
                 let onchange = Closure::<dyn FnMut(_)>::new({
                     let proxy = self.proxy.clone();
                     move |event: web_sys::Event| {
-                        web_sys::console::log(&"ROM file uploaded.".into());
+                        if let Some(file) = event
+                            .current_target()
+                            .and_then(|target| target.dyn_into::<HtmlInputElement>().ok())
+                            .and_then(|input| input.files())
+                            .and_then(|files| files.item(0))
+                        {
+                            let reader = FileReader::new().unwrap_throw();
+                            reader.read_as_array_buffer(&file);
+
+                            // Reader onload handler
+                            let onload = Closure::<dyn FnMut(_)>::new({
+                                let reader = reader.clone();
+                                move |_event: web_sys::ProgressEvent| {
+                                    if let Ok(result) = reader.result() {
+                                        let data = Uint8Array::new(&result).to_vec();
+                                        web_sys::console::log_1(
+                                            &format!("ROM file uploaded: {} bytes.", data.len())
+                                                .into(),
+                                        );
+                                    }
+                                }
+                            });
+
+                            reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+
+                            // WARN: Leaking memory in rust, but we want a global handler.
+                            onload.forget();
+                        }
                     }
                 });
 

@@ -46,4 +46,8 @@ web-sys = { version = "0.3.77", features = [
     "Window",
     "Element",
     "HtmlInputElement",
+    "File",
+    "FileList",
+    "FileReader",
+    "ProgressEvent",
 ]}
