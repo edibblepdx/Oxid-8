@@ -59,7 +59,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Stretch uv (somewhat) radially
     uv -= 0.5;
     let r: vec2<f32> = vec2<f32>(0.0) - uv;
-    uv = uv - length(dist) * 0.2 * r;
+    uv = uv - length(dist) * 0.15 * r;
     uv += 0.5;
 
     // Sample where in [0,1] range

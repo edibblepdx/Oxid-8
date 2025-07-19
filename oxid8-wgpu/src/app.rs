@@ -1,10 +1,14 @@
-use std::{path::PathBuf, sync::Arc, time::Instant};
+use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::Config;
-use crate::{event::UserEvent, wgpu_context::WgpuContext};
+use crate::{
+    event::{RomSource, UserEvent},
+    wgpu_context::WgpuContext,
+};
 
-use oxid8_core::{Oxid8, TIMER_TICK};
+use oxid8_core::Oxid8;
+use web_time::{Duration, Instant};
 use winit::{
     application::ApplicationHandler,
     event::*,
@@ -16,6 +20,9 @@ use winit::{
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+/// The app is initialized in `Suspended` state and when a rom is
+/// loaded, the app is swapped to `Resumed` state. The app will
+/// remain suspended at least until the Wgpu context is created.
 pub enum State {
     Suspended,
     Resumed {
@@ -25,10 +32,17 @@ pub enum State {
 }
 
 impl State {
+    /// Handle user input key.
     pub fn handle_key(&mut self, key_code: KeyCode, val: bool) {
         use KeyCode::*;
 
         if let State::Resumed { emu, .. } = self {
+            /*
+             * 1 2 3 C
+             * 4 5 6 D
+             * 7 8 9 E
+             * A 0 B f
+             */
             match key_code {
                 Digit1 => emu.set_key(0x1, val),
                 Digit2 => emu.set_key(0x2, val),
@@ -52,17 +66,25 @@ impl State {
     }
 }
 
+/// The
 pub struct App {
+    /// Event loop proxy to send user events. Only strictly necessary on web,
+    /// but it provides some helpful organization on native.
     proxy: winit::event_loop::EventLoopProxy<UserEvent>,
+    /// Draw to this context.
     ctx: Option<WgpuContext>,
+    /// App state affects various app operations.
     state: State,
+    /// Native configuration via command line arguments.
     #[cfg(not(target_arch = "wasm32"))]
     config: Config,
+    /// Store the html document for easy access.
     #[cfg(target_arch = "wasm32")]
     document: Option<web_sys::Document>,
 }
 
 impl App {
+    /// Create a new app in Suspended state.
     pub fn new(
         event_loop: &EventLoop<UserEvent>,
         #[cfg(not(target_arch = "wasm32"))] config: Config,
@@ -78,8 +100,11 @@ impl App {
         }
     }
 
-    // WARN: check this implementation
-    pub fn resume(&mut self, rom_path: PathBuf) {
+    /// Resume the app when given a rom by creating a new emulator
+    /// instance, loading the font, and loading the rom, then set
+    /// the app state to Resumed.
+    pub fn resume(&mut self, rom_source: RomSource) {
+        // WARN: check this implementation
         if let Some(ctx) = &self.ctx {
             let mut emu = Oxid8::default();
             ctx.texture.update(&ctx.queue, emu.screen_ref());
@@ -87,28 +112,29 @@ impl App {
             emu.load_font();
 
             // WARN: what to do if this fails?
-            if emu.load_rom_path(&rom_path).is_ok() {
-                self.state = State::Resumed {
-                    emu,
-                    last_frame: None,
-                };
-                // WARN: test
-                println!("rom loaded");
+            match rom_source {
+                // Native
+                RomSource::Path(path) => {
+                    if emu.load_rom_path(&path).is_ok() {
+                        self.state = State::Resumed {
+                            emu,
+                            last_frame: None,
+                        };
+                    }
+                }
+                // Wasm
+                RomSource::Bytes(bytes) => {
+                    if emu.load_rom_bytes(&bytes).is_ok() {
+                        self.state = State::Resumed {
+                            emu,
+                            last_frame: None,
+                        };
+                    }
+                }
             }
         }
     }
 }
-
-/*
-fn temp() {
-    use web_sys::HtmlInputElement;
-
-    const INPUT_ID: &str = "input";
-
-    let input = document.get_element_by_id(INPUT_ID).unwrap_throw();
-    let html_input_element = input.unchecked_into::<HtmlInputElement>();
-}
-*/
 
 impl ApplicationHandler<UserEvent> for App {
     /// Emitted when the application has been resumed.
@@ -130,6 +156,7 @@ impl ApplicationHandler<UserEvent> for App {
             let html_canvas_element = canvas.unchecked_into();
             window_attributes = window_attributes.with_canvas(Some(html_canvas_element));
 
+            // Save the document for setting callbacks on other html elements
             self.document = Some(document);
         }
 
@@ -150,7 +177,10 @@ impl ApplicationHandler<UserEvent> for App {
             // Set App state to Resumed
             assert!(
                 self.proxy
-                    .send_event(UserEvent::Resumed(self.config.rom_path.clone()))
+                    // send the rom path as the event contents
+                    .send_event(UserEvent::RomSelected(RomSource::Path(
+                        self.config.rom_path.clone()
+                    )))
                     .is_ok()
             );
 
@@ -195,12 +225,14 @@ impl ApplicationHandler<UserEvent> for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
+                // Only enter the gameloop if the app is Resumed.
                 if let State::Resumed {
                     emu, last_frame, ..
                 } = &mut self.state
                 {
                     match last_frame {
-                        Some(last) if last.elapsed() >= TIMER_TICK => {
+                        // 16ms frame time
+                        Some(last) if last.elapsed() >= Duration::from_millis(16) => {
                             *last_frame = Some(Instant::now());
                             if emu.next_frame().is_ok() {
                                 // Update texture
@@ -229,6 +261,7 @@ impl ApplicationHandler<UserEvent> for App {
                     },
                 ..
             } => {
+                // Only care about user input if the app is Resumed.
                 if let State::Resumed { .. } = &mut self.state {
                     // match key state
                     match state {
@@ -244,11 +277,9 @@ impl ApplicationHandler<UserEvent> for App {
     /// Emitted when an event is sent from EventLoopProxy::send_event.
     #[allow(unused_mut)]
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: UserEvent) {
-        use UserEvent::*;
-
         match event {
             #[cfg(target_arch = "wasm32")]
-            ContextCreated(mut ctx) => {
+            UserEvent::ContextCreated(mut ctx) => {
                 if !ctx.is_surface_configured {
                     // Configure surface for the first time on web
                     ctx.resize(ctx.window.inner_size());
@@ -270,7 +301,7 @@ impl ApplicationHandler<UserEvent> for App {
                 };
                 let html_input_element = input.unchecked_into::<HtmlInputElement>();
 
-                // TODO: Handle the Err variants
+                // TODO: Handle the Err variants!!!!!!!
 
                 // Input onchange handler
                 let onchange = Closure::<dyn FnMut(_)>::new({
@@ -287,14 +318,20 @@ impl ApplicationHandler<UserEvent> for App {
 
                             // Reader onload handler
                             let onload = Closure::<dyn FnMut(_)>::new({
+                                let proxy = proxy.clone();
                                 let reader = reader.clone();
                                 move |_event: web_sys::ProgressEvent| {
                                     if let Ok(result) = reader.result() {
                                         let data = Uint8Array::new(&result).to_vec();
+                                        // Log ROM size to console
                                         web_sys::console::log_1(
                                             &format!("ROM file uploaded: {} bytes.", data.len())
                                                 .into(),
                                         );
+                                        // Resume the app sending the rom as bytes
+                                        proxy.send_event(UserEvent::RomSelected(RomSource::Bytes(
+                                            data,
+                                        )));
                                     }
                                 }
                             });
@@ -313,7 +350,7 @@ impl ApplicationHandler<UserEvent> for App {
                 // WARN: Leaking memory in rust, but we want a global handler.
                 onchange.forget();
             }
-            Resumed(rom_path) => self.resume(rom_path),
+            UserEvent::RomSelected(rom_source) => self.resume(rom_source),
         }
     }
 }
