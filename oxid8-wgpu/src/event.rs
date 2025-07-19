@@ -4,12 +4,14 @@ use std::path::PathBuf;
 use crate::wgpu_context::WgpuContext;
 
 /// How to rom source is stored.
-/// An alternative to this would be to use #[cfg].
+/// An alternative to this would be to only use #[cfg].
 #[allow(unused)]
 pub enum RomSource {
     /// As a file for native use
+    #[cfg(not(target_arch = "wasm32"))]
     Path(PathBuf),
     /// As bytes for web use
+    #[cfg(target_arch = "wasm32")]
     Bytes(Vec<u8>),
 }
 

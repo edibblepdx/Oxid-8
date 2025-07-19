@@ -114,6 +114,7 @@ impl App {
             // WARN: what to do if this fails?
             match rom_source {
                 // Native
+                #[cfg(not(target_arch = "wasm32"))]
                 RomSource::Path(path) => {
                     if emu.load_rom(&path).is_ok() {
                         self.state = State::Resumed {
@@ -123,15 +124,37 @@ impl App {
                     }
                 }
                 // Wasm
+                #[cfg(target_arch = "wasm32")]
                 RomSource::Bytes(bytes) => {
                     if emu.load_rom_bytes(&bytes).is_ok() {
                         self.state = State::Resumed {
                             emu,
                             last_frame: None,
                         };
+                        self.focus_canvas();
                     }
                 }
             }
+        }
+    }
+
+    /// Gets the primary canvas element.
+    #[cfg(target_arch = "wasm32")]
+    pub fn get_canvas(&self) -> Option<web_sys::HtmlCanvasElement> {
+        if let Some(document) = &self.document {
+            document
+                .get_element_by_id(&"canvas")
+                .and_then(|canvas| canvas.dyn_into::<web_sys::HtmlCanvasElement>().ok())
+        } else {
+            None
+        }
+    }
+
+    /// Focuses the canvas element.
+    #[cfg(target_arch = "wasm32")]
+    pub fn focus_canvas(&self) {
+        if let Some(canvas) = self.get_canvas() {
+            let _ = canvas.focus();
         }
     }
 }

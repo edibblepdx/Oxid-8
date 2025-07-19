@@ -1,11 +1,11 @@
-use anyhow::*;
+use anyhow::Result;
+
 use oxid8_core::{SCREEN_AREA, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 const WHITE: [u8; 4] = [255, 255, 255, 255];
 const BLACK: [u8; 4] = [0, 0, 0, 255];
 
 pub struct Texture {
-    #[allow(unused)]
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
@@ -13,6 +13,7 @@ pub struct Texture {
 }
 
 impl Texture {
+    /// Create a new empty texture for the render pipeline.
     pub fn new(device: &wgpu::Device) -> Result<Self> {
         let size = wgpu::Extent3d {
             width: SCREEN_WIDTH as u32,
@@ -53,6 +54,7 @@ impl Texture {
         Ok(tx)
     }
 
+    /// Given the emulator screen, update the texture.
     pub fn update(&self, queue: &wgpu::Queue, screen: &[bool]) {
         let mut tx: Vec<u8> = vec![];
         tx.reserve(4 * SCREEN_AREA);

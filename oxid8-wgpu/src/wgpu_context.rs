@@ -4,10 +4,7 @@ use crate::{geometry::*, texture::Texture};
 
 use anyhow::Result;
 use wgpu::util::DeviceExt;
-use winit::{
-    //keyboard::{KeyCode, PhysicalKey},
-    window::Window,
-};
+use winit::window::Window;
 
 pub struct WgpuContext {
     pub(crate) window: Arc<Window>,
