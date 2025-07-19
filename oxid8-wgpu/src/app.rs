@@ -58,6 +58,8 @@ pub struct App {
     state: State,
     #[cfg(not(target_arch = "wasm32"))]
     config: Config,
+    #[cfg(target_arch = "wasm32")]
+    document: Option<web_sys::Document>,
 }
 
 impl App {
@@ -71,6 +73,8 @@ impl App {
             state: State::Suspended,
             #[cfg(not(target_arch = "wasm32"))]
             config,
+            #[cfg(target_arch = "wasm32")]
+            document: None,
         }
     }
 
@@ -95,6 +99,17 @@ impl App {
     }
 }
 
+/*
+fn temp() {
+    use web_sys::HtmlInputElement;
+
+    const INPUT_ID: &str = "input";
+
+    let input = document.get_element_by_id(INPUT_ID).unwrap_throw();
+    let html_input_element = input.unchecked_into::<HtmlInputElement>();
+}
+*/
+
 impl ApplicationHandler<UserEvent> for App {
     /// Emitted when the application has been resumed.
     /// Initialize graphics context and create a window after first resumed event.
@@ -114,6 +129,8 @@ impl ApplicationHandler<UserEvent> for App {
             let canvas = document.get_element_by_id(CANVAS_ID).unwrap_throw();
             let html_canvas_element = canvas.unchecked_into();
             window_attributes = window_attributes.with_canvas(Some(html_canvas_element));
+
+            self.document = Some(document);
         }
 
         // Create window object
@@ -158,8 +175,6 @@ impl ApplicationHandler<UserEvent> for App {
 
             // request redraw in user_event
         }
-
-        // TODO: Load rom from config or on wasm spawn thread local
     }
 
     /// Emitted when the OS sends an event to a winit window.
@@ -241,6 +256,33 @@ impl ApplicationHandler<UserEvent> for App {
                     ctx.window.request_redraw();
                 }
                 self.ctx = Some(ctx);
+
+                // Install input event handler to upload roms on web
+                use wasm_bindgen::JsCast;
+                use web_sys::HtmlInputElement;
+                use winit::platform::web::WindowAttributesExtWebSys;
+
+                const INPUT_ID: &str = "input";
+
+                let input = if let Some(document) = &self.document {
+                    document.get_element_by_id(INPUT_ID).unwrap_throw()
+                } else {
+                    panic!("no document");
+                };
+                let html_input_element = input.unchecked_into::<HtmlInputElement>();
+
+                let onchange = Closure::<dyn FnMut(_)>::new({
+                    let proxy = self.proxy.clone();
+                    move |event: web_sys::Event| {
+                        web_sys::console::log(&"ROM file uploaded.".into());
+                    }
+                });
+
+                html_input_element
+                    .add_event_listener_with_callback("change", onchange.as_ref().unchecked_ref());
+
+                // WARN: Leaking memory in rust, but we want a global handler.
+                onchange.forget();
             }
             Resumed(rom_path) => self.resume(rom_path),
         }
