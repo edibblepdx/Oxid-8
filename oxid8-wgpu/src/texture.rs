@@ -1,3 +1,6 @@
+//! The Chip-8 screen is drawn to a texture and rendered to a
+//! full screen quad.
+
 use anyhow::Result;
 
 use oxid8_core::{SCREEN_AREA, SCREEN_HEIGHT, SCREEN_WIDTH};

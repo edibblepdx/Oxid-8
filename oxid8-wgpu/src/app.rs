@@ -1,3 +1,7 @@
+//! The App and it's State including the implementation of the
+//! `ApplicationHandler` trait for handling events. User events
+//! set callbacks on wasm32.
+
 use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -324,8 +328,6 @@ impl ApplicationHandler<UserEvent> for App {
                 };
                 let html_input_element = input.unchecked_into::<HtmlInputElement>();
 
-                // TODO: Handle the Err variants!!!!!!!
-
                 // Input onchange handler
                 let onchange = Closure::<dyn FnMut(_)>::new({
                     let proxy = self.proxy.clone();
@@ -337,7 +339,7 @@ impl ApplicationHandler<UserEvent> for App {
                             .and_then(|files| files.item(0))
                         {
                             let reader = FileReader::new().unwrap_throw();
-                            reader.read_as_array_buffer(&file);
+                            let _ = reader.read_as_array_buffer(&file);
 
                             // Reader onload handler
                             let onload = Closure::<dyn FnMut(_)>::new({
@@ -352,9 +354,13 @@ impl ApplicationHandler<UserEvent> for App {
                                                 .into(),
                                         );
                                         // Resume the app sending the rom as bytes
-                                        proxy.send_event(UserEvent::RomSelected(RomSource::Bytes(
-                                            data,
-                                        )));
+                                        assert!(
+                                            proxy
+                                                .send_event(UserEvent::RomSelected(
+                                                    RomSource::Bytes(data,)
+                                                ))
+                                                .is_ok()
+                                        );
                                     }
                                 }
                             });
@@ -367,7 +373,7 @@ impl ApplicationHandler<UserEvent> for App {
                     }
                 });
 
-                html_input_element
+                let _ = html_input_element
                     .add_event_listener_with_callback("change", onchange.as_ref().unchecked_ref());
 
                 // WARN: Leaking memory in rust, but we want a global handler.

@@ -1,6 +1,10 @@
+//! Chip-8 Interpreter windowed natively and on the web.
+
 use cfg_if::cfg_if;
-use std::path::PathBuf;
 use winit::event_loop::EventLoop;
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::PathBuf;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;

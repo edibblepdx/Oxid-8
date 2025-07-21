@@ -1,3 +1,5 @@
+//! Setup the Wgpu and Winit context.
+
 use std::sync::Arc;
 
 use crate::{geometry::*, texture::Texture};

@@ -1,3 +1,6 @@
+//! User events send via the winit event_loop proxy.
+
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
 
 #[cfg(target_arch = "wasm32")]
@@ -5,7 +8,6 @@ use crate::wgpu_context::WgpuContext;
 
 /// How to rom source is stored.
 /// An alternative to this would be to only use #[cfg].
-#[allow(unused)]
 pub enum RomSource {
     /// As a file for native use
     #[cfg(not(target_arch = "wasm32"))]
@@ -20,7 +22,6 @@ pub enum RomSource {
 /// since I can load the rom directly, and even
 /// forgo a proxy all together on native. I like
 /// the organization this provides.
-#[allow(unused)]
 pub enum UserEvent {
     /// Creating a Wgpu Context is async in the web
     #[cfg(target_arch = "wasm32")]
