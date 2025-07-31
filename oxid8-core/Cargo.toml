@@ -1,12 +1,15 @@
 [package]
 name = "oxid8-core"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Ethan Dibble <edibble@pdx.edu>"]
 description = "CHIP-8 interpreter core."
 repository = "https://github.com/edibblepdx/Oxid-8"
 readme = "README.md"
 license = "MIT"
+categories = ["emulators"]
+keywords = ["chip-8", "emulator"]
+homepage = "https://edibblepdx.github.io/Oxid-8/"
 
 [dependencies]
 rand = "0.9.1"

@@ -41,7 +41,6 @@ Sound in the tui is played by printing the bell character `\x07`. If you don't h
 ## TODO
 
 - merge tui renderer into main app
-- fix web renderer
 - chromatic abberation effect
 - debug mode
 - super chip-8 extension

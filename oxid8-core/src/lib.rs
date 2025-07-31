@@ -6,6 +6,84 @@
 //!
 //! This is the core interpreter library for `Oxid8`. So that developers can
 //! create their own renderers on top of this library crate.
+//!
+//! # Getting Started
+//!
+//! ```no_run
+//! use oxid8_core::Oxid8;
+//! use std::time::{Duration, Instant};
+//!
+//! #[derive(Default)]
+//! struct State {
+//!     should_exit: bool,
+//!     last_frame: Option<Instant>,
+//! }
+//!
+//! #[derive(Default)]
+//! struct Emu {
+//!     state: State,
+//!     core: Oxid8,
+//! }
+//!
+//! fn main() -> std::io::Result<()> {
+//!     let mut emu = Emu::default();
+//!     emu.core.load_font();
+//!     emu.core.load_rom("rom_path")?;
+//!
+//!     while !emu.state.should_exit {
+//!         let time = Instant::now();
+//!
+//!         // TODO: Poll and Handle Events.
+//!
+//!         if let Some(last_frame) = emu.state.last_frame {
+//!             if time.duration_since(last_frame) >= Duration::from_millis(16) {
+//!                 if let Err(err) = emu.core.next_frame() {
+//!                     panic!("{err}");
+//!                 }
+//!
+//!                 // TODO: Draw current frame.
+//!
+//!                 emu.state.last_frame = Some(time);
+//!             }
+//!
+//!             if emu.core.sound() {
+//!                 // TODO: Beep!
+//!             }
+//!
+//!         } else {
+//!             emu.state.last_frame = Some(Instant::now());
+//!         }
+//!     }
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! # WASM Compatibility
+//!
+//! ```toml
+//! # Cargo.toml
+//!
+//! [dependencies]
+//! web-time = "1.1.0"
+//!
+//! [target.'cfg(target_arch = "wasm32")'.dependencies]
+//! getrandom = { version = "0.3", features = ["wasm_js"] }
+//! ```
+//!
+//! ```toml
+//! # config.toml
+//!
+//! [target.'cfg(target_arch = "wasm32")']
+//! rustflags = ["--cfg", 'getrandom_backend="wasm_js"']
+//! ```
+//!
+//! # Frame Time
+//!
+//! You should generate frames at 60Hz or roughly 16ms if not relying on
+//! vsync. `std::time::{Instant, Duration}` panic in the web so use the
+//! [web-time](https://crates.io/crates/web-time) crate when compiling to
+//! web assembly.
 
 use rand::{Rng, rng, rngs::ThreadRng};
 use std::{fmt, io, time::Duration};
@@ -33,7 +111,7 @@ const FONTSET_SIZE: usize = 80;
 const FONT_ADDR: u16 = 0x050;
 
 // Some games may behave differently based on the font.
-// This is the most common font that I see.
+// This font set is common.
 const FONTSET: [u8; FONTSET_SIZE] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -140,10 +218,6 @@ impl Oxid8 {
         Oxid8::default()
     }
 
-    // TODO: panic hook example to reset emulator
-    // when a user uploads a bad rom so that they
-    // can try a different one.
-
     /// Reset all parameters to default.
     /// Must call `load_font` to reload font.
     pub fn reset(&mut self) {
@@ -152,8 +226,14 @@ impl Oxid8 {
 
     /// Emulates a full frame.
     ///
-    /// Currently runs cpu cycles at 600Hz or 10 times per
-    /// frame at 60Hz.
+    /// Each frame emulates 10 cpu cycles and decrements
+    /// the sound and delay timers. If your frame time is
+    /// 60Hz, cpu cycles run at 600Hz and timers at 60Hz.
+    /// CHIP-8 cpu cycles have historically ran anywhere
+    /// between 500Hz to 700Hz depending on hardware and
+    /// implementation. If you want finer control over
+    /// cpu speeds use call `run_cycle` yourself, and
+    /// call `dec_timers` at a rate of 16ms.
     ///
     /// # Errors
     ///
@@ -179,6 +259,9 @@ impl Oxid8 {
     }
 
     /// Emulates a single cycle.
+    ///
+    /// Use `next_frame` instead if you don't want to
+    /// control cpu speed.
     ///
     /// # Errors
     ///
@@ -271,6 +354,9 @@ impl Oxid8 {
     }
 
     /// Decrements the delay and sound and timers.
+    ///
+    /// Use `next_frame` instead if you don't want to
+    /// control cpu speed.
     pub fn dec_timers(&mut self) {
         if self.dt > 0 {
             self.dt -= 1;
