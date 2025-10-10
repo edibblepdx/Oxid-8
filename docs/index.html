@@ -5,44 +5,66 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- phones -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <title>Oxid-8</title>
     <link rel="stylesheet" href="assets/index.css"/>
   </head>
 
   <body>
-    <div class="container hide">
-      <h4>keypad:</h4>
-      <div class="keypad">
-        <div>1</div>
-        <div>2</div>
-        <div>3</div>
-        <div>4</div>
-        <div>q</div>
-        <div>w</div>
-        <div>e</div>
-        <div>r</div>
-        <div>a</div>
-        <div>s</div>
-        <div>d</div>
-        <div>f</div>
-        <div>z</div>
-        <div>x</div>
-        <div>c</div>
-        <div>v</div>
-      </div>
-    </div>
+
     <div class="container">
       <input id="input" type="file" />
       <canvas id="canvas" width="64" height="32"></canvas>
     </div>
 
-    <script type="module">
-      import init from "./pkg/oxid8_wgpu.js";
-      init().then(() => {
-         console.log("WASM Loaded");
-      });
-    </script>
+    <div class="container hide">
+      <div class="keypad">
+        <div><button data-key="Digit1">1</button></div>
+        <div><button data-key="Digit2">2</button></div>
+        <div><button data-key="Digit3">3</button></div>
+        <div><button data-key="Digit4">4</button></div>
+        <div><button data-key="KeyQ">Q</button></div>
+        <div><button data-key="KeyW">W</button></div>
+        <div><button data-key="KeyE">E</button></div>
+        <div><button data-key="KeyR">R</button></div>
+        <div><button data-key="KeyA">A</button></div>
+        <div><button data-key="KeyS">S</button></div>
+        <div><button data-key="KeyD">D</button></div>
+        <div><button data-key="KeyF">F</button></div>
+        <div><button data-key="KeyZ">Z</button></div>
+        <div><button data-key="KeyX">X</button></div>
+        <div><button data-key="KeyC">C</button></div>
+        <div><button data-key="KeyV">V</button></div>
+      </div>
+    </div>
 
   </body>
+
+  <script type="module">
+    import init, { key_event } from "./pkg/oxid8_wgpu.js";
+    init().then(() => {
+      console.log("WASM Loaded");
+
+      document.querySelectorAll("[data-key]").forEach(btn => {
+        btn.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          key_event(btn.dataset.key, true);
+        })
+        btn.addEventListener("touchend", (e) => {
+          e.preventDefault();
+          key_event(btn.dataset.key, false);
+        })
+        btn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          key_event(btn.dataset.key, true);
+          await new Promise(r => setTimeout(r, 500));
+          key_event(btn.dataset.key, false);
+        })
+      })
+    });
+  </script>
 
 </html>

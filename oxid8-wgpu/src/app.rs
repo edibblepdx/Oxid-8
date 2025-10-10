@@ -70,11 +70,11 @@ impl State {
     }
 }
 
-/// The
+/// The Winit-Wgpu app
 pub struct App {
     /// Event loop proxy to send user events. Only strictly necessary on web,
     /// but it provides some helpful organization on native.
-    proxy: winit::event_loop::EventLoopProxy<UserEvent>,
+    pub(crate) proxy: winit::event_loop::EventLoopProxy<UserEvent>,
     /// Draw to this context.
     ctx: Option<WgpuContext>,
     /// App state affects various app operations.
@@ -379,6 +379,8 @@ impl ApplicationHandler<UserEvent> for App {
                 // WARN: Leaking memory in rust, but we want a global handler.
                 onchange.forget();
             }
+            #[cfg(target_arch = "wasm32")]
+            UserEvent::VirtualKey(key_code, val) => self.state.handle_key(key_code, val),
             UserEvent::RomSelected(rom_source) => self.resume(rom_source),
         }
     }

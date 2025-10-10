@@ -1,12 +1,14 @@
 /* tslint:disable */
 /* eslint-disable */
 export function start(): void;
+export function key_event(key_code: string, val: boolean): void;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly start: () => void;
+  readonly key_event: (a: number, b: number, c: number) => void;
   readonly __externref_table_alloc: () => number;
   readonly __wbindgen_export_1: WebAssembly.Table;
   readonly __wbindgen_exn_store: (a: number) => void;
@@ -14,11 +16,11 @@ export interface InitOutput {
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_export_6: WebAssembly.Table;
-  readonly closure254_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure401_externref_shim: (a: number, b: number, c: any) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h793d6d4022d6dad8: (a: number, b: number) => void;
-  readonly closure2865_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure2862_externref_shim: (a: number, b: number, c: any, d: any) => void;
-  readonly closure3038_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure2856_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure2853_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure3029_externref_shim: (a: number, b: number, c: any) => void;
   readonly __wbindgen_start: () => void;
 }
 

@@ -26,6 +26,9 @@ pub enum UserEvent {
     /// Creating a Wgpu Context is async in the web
     #[cfg(target_arch = "wasm32")]
     ContextCreated(WgpuContext),
+    /// Virtual key for mobile phones
+    #[cfg(target_arch = "wasm32")]
+    VirtualKey(winit::keyboard::KeyCode, bool),
     /// User uploaded rom
     RomSelected(RomSource),
     // TODO: Shader swap event

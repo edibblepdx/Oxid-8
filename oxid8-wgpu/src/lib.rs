@@ -1,8 +1,15 @@
 //! Chip-8 Interpreter windowed natively and on the web.
 
-use cfg_if::cfg_if;
-use winit::event_loop::EventLoop;
+mod app;
+mod event;
+mod geometry;
+mod texture;
+mod wgpu_context;
 
+use cfg_if::cfg_if;
+use winit::event_loop::{EventLoop, EventLoopProxy};
+
+use std::cell::OnceCell;
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
 
@@ -11,11 +18,9 @@ use wasm_bindgen::prelude::*;
 
 use crate::{app::App, event::UserEvent};
 
-mod app;
-mod event;
-mod geometry;
-mod texture;
-mod wgpu_context;
+thread_local! {
+    static EVENT_LOOP_PROXY: OnceCell<EventLoopProxy<UserEvent>> = OnceCell::new();
+}
 
 #[cfg(not(target_arch = "wasm32"))]
 pub struct Config {
@@ -38,6 +43,7 @@ pub fn run(#[cfg(not(target_arch = "wasm32"))] config: Config) -> anyhow::Result
         #[cfg(not(target_arch = "wasm32"))]
         config,
     );
+    EVENT_LOOP_PROXY.with(|cell| cell.set(app.proxy.clone()).unwrap());
 
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
@@ -58,4 +64,41 @@ pub fn start() -> Result<(), wasm_bindgen::JsValue> {
     run().unwrap_throw();
 
     Ok(())
+}
+
+/// For Mobile Phones
+#[cfg(target_arch = "wasm32")]
+fn map_key(key_code: &str) -> Option<winit::keyboard::KeyCode> {
+    use winit::keyboard::KeyCode::*;
+    Some(match key_code {
+        "Digit1" => Digit1,
+        "Digit2" => Digit2,
+        "Digit3" => Digit3,
+        "Digit4" => Digit4,
+        "KeyQ" => KeyQ,
+        "KeyW" => KeyW,
+        "KeyE" => KeyE,
+        "KeyR" => KeyR,
+        "KeyA" => KeyA,
+        "KeyS" => KeyS,
+        "KeyD" => KeyD,
+        "KeyF" => KeyF,
+        "KeyZ" => KeyZ,
+        "KeyX" => KeyX,
+        "KeyC" => KeyC,
+        "KeyV" => KeyV,
+        _ => return None,
+    })
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn key_event(key_code: &str, val: bool) {
+    if let Some(key_code) = map_key(key_code) {
+        EVENT_LOOP_PROXY.with(|cell| {
+            if let Some(proxy) = cell.get() {
+                let _ = proxy.send_event(UserEvent::VirtualKey(key_code, val));
+            }
+        })
+    }
 }
