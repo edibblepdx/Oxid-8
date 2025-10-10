@@ -10,17 +10,39 @@
   </head>
 
   <body>
+    <div class="container hide">
+      <h4>keypad:</h4>
+      <div class="keypad">
+        <div>1</div>
+        <div>2</div>
+        <div>3</div>
+        <div>4</div>
+        <div>q</div>
+        <div>w</div>
+        <div>e</div>
+        <div>r</div>
+        <div>a</div>
+        <div>s</div>
+        <div>d</div>
+        <div>f</div>
+        <div>z</div>
+        <div>x</div>
+        <div>c</div>
+        <div>v</div>
+      </div>
+    </div>
     <div class="container">
       <input id="input" type="file" />
-      <canvas id="canvas" width="64" height="32" />
+      <canvas id="canvas" width="64" height="32"></canvas>
     </div>
-  </body>
 
-  <script type="module">
-    import init from "./pkg/oxid8_wgpu.js";
-    init().then(() => {
-       console.log("WASM Loaded");
-    });
-  </script>
+    <script type="module">
+      import init from "./pkg/oxid8_wgpu.js";
+      init().then(() => {
+         console.log("WASM Loaded");
+      });
+    </script>
+
+  </body>
 
 </html>
