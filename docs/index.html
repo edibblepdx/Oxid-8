@@ -51,10 +51,12 @@
       document.querySelectorAll("[data-key]").forEach(btn => {
         btn.addEventListener("touchstart", (e) => {
           e.preventDefault();
+          btn.classList.add("pressed");
           key_event(btn.dataset.key, true);
         })
         btn.addEventListener("touchend", (e) => {
           e.preventDefault();
+          btn.classList.remove("pressed");
           key_event(btn.dataset.key, false);
         })
         btn.addEventListener("click", async (e) => {
