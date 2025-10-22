@@ -38,6 +38,12 @@ Non-kitty terminals are supported by clearing the virtual keyboard after each cy
 
 Sound in the tui is played by printing the bell character `\x07`. If you don't hear anything when you are expecting to, it's possible that you may have muted the bell.
 
+## Bundling
+
+```bash
+wasm-pack build --target web
+```
+
 ## TODO
 
 - merge tui renderer into main app

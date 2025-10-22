@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::{geometry::*, texture::Texture};
 
 use anyhow::Result;
+use cfg_if::cfg_if;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
@@ -26,6 +27,7 @@ pub struct WgpuContext {
 }
 
 impl WgpuContext {
+    /// Initializes a new [`WgpuContext`].
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             #[cfg(not(target_arch = "wasm32"))]
@@ -189,6 +191,7 @@ impl WgpuContext {
         Ok(ctx)
     }
 
+    /// Reconfigures the surface.
     fn configure_surface(&mut self) {
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -204,15 +207,41 @@ impl WgpuContext {
         self.is_surface_configured = true;
     }
 
+    /// Resizes the surface.
+    ///
+    /// Native gpu texture limit dimension should generally be 8192.
+    /// Web gpu texture limit dimension should generally be 2048.
+    ///
+    /// # Panics
+    /// The native limits should not be exceeded in normal use, otherwise
+    /// `resize` will panic. The web limits can be exceeded in normal use so
+    /// they will instead be resized, maintaining aspect ratio.
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
-            self.size = new_size;
+            cfg_if! {
+                if #[cfg(target_arch = "wasm32")] {
+                    let max_dim = self.device.limits().max_texture_dimension_2d;
 
+                    let mut width = new_size.width;
+                    let mut height = new_size.height;
+
+                    if width > max_dim {
+                        let aspect = width as f32 / height as f32;
+                        width = max_dim;
+                        height = (max_dim as f32 / aspect) as u32;
+                    }
+
+                    self.size = winit::dpi::PhysicalSize::new(width, height);
+                } else {
+                    self.size = new_size;
+                }
+            }
             // reconfigure the surface
             self.configure_surface();
         }
     }
 
+    /// Renders to the surface.
     pub fn render(&mut self) {
         // We can't render unless the surface is configured
         if !self.is_surface_configured {
