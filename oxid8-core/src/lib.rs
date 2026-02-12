@@ -140,6 +140,11 @@ const NUM_KEYS: usize = 16;
 const VF: usize = 15;
 const START_ADDR: u16 = 0x200;
 
+pub enum Error {
+    InvalidOpcode { opcode: u16, pc: u16 },
+    RomTooLarge,
+}
+
 #[derive(Debug)]
 struct Opcode(u8, u8, u8, u8);
 
@@ -252,7 +257,7 @@ impl Oxid8 {
     /// Other opcodes may panic if the game attempts to
     /// perform an invalid action. Otherwise the interpreter
     /// can be left in an invalid state. The rom is bad.
-    pub fn next_frame(&mut self) -> Result<(), String> {
+    pub fn next_frame(&mut self) -> Result<(), Error> {
         for _ in 0..10 {
             self.run_cycle()?;
         }
@@ -280,7 +285,7 @@ impl Oxid8 {
     /// Other opcodes may panic if the game attempts to
     /// perform an invalid action. Otherwise the interpreter
     /// can be left in an invalid state. The rom is bad.
-    pub fn run_cycle(&mut self) -> Result<(), String> {
+    pub fn run_cycle(&mut self) -> Result<(), Error> {
         #[rustfmt::skip]
         let opcode = Opcode::new(
             self.ram[self.pc as usize],
@@ -290,12 +295,11 @@ impl Oxid8 {
         let pc_at_err = self.pc;
         self.pc += 2;
 
-        let invalid = || -> Result<(), String> {
-            Err(format!(
-                "Invalid Instruction: {:04X} at {}",
-                opcode.full(),
-                pc_at_err,
-            ))
+        let invalid = || -> Result<(), Error> {
+            Err(Error::InvalidOpcode {
+                opcode: opcode.full(),
+                pc: pc_at_err,
+            })
         };
 
         match opcode.0 {
@@ -403,6 +407,7 @@ impl Oxid8 {
     /// # Errors
     ///
     /// If there is any issue loading the ROM, then an error is returned.
+    #[cfg(feature = "std")]
     pub fn load_rom(&mut self, path: impl AsRef<std::path::Path>) -> io::Result<()> {
         use std::fs;
 
