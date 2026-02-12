@@ -25,7 +25,7 @@
 //!     core: Oxid8,
 //! }
 //!
-//! fn main() -> std::io::Result<()> {
+//! fn main() -> Result<(), oxid8_core::Error> {
 //!     let mut emu = Emu::default();
 //!     emu.core.load_font();
 //!     emu.core.load_rom("rom_path")?;
@@ -38,7 +38,7 @@
 //!         if let Some(last_frame) = emu.state.last_frame {
 //!             if time.duration_since(last_frame) >= Duration::from_millis(16) {
 //!                 if let Err(err) = emu.core.next_frame() {
-//!                     panic!("{err}");
+//!                     panic!("{err:?}");
 //!                 }
 //!
 //!                 // TODO: Draw current frame.
@@ -88,7 +88,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use rand::{Rng, rng, rngs::ThreadRng};
-use std::{fmt, io, time::Duration};
+use std::{fmt, time::Duration};
 
 /// Standard CPU tick rate set to 700Hz. This value is not used internally.
 /// Run a CPU cycle this often.
@@ -140,9 +140,17 @@ const NUM_KEYS: usize = 16;
 const VF: usize = 15;
 const START_ADDR: u16 = 0x200;
 
+#[derive(Debug, PartialEq)]
 pub enum Error {
-    InvalidOpcode { opcode: u16, pc: u16 },
-    RomTooLarge,
+    InvalidOpcode {
+        opcode: u16,
+        pc: u16,
+    },
+    RomTooLarge {
+        size: usize,
+    },
+    #[cfg(feature = "std")]
+    IOError,
 }
 
 #[derive(Debug)]
@@ -404,10 +412,8 @@ impl Oxid8 {
     ///
     /// If there is any issue loading the ROM, then an error is returned.
     #[cfg(feature = "std")]
-    pub fn load_rom(&mut self, path: impl AsRef<std::path::Path>) -> io::Result<()> {
-        use std::fs;
-
-        let rom_data: Vec<u8> = fs::read(path)?;
+    pub fn load_rom(&mut self, path: impl AsRef<std::path::Path>) -> Result<(), Error> {
+        let rom_data: Vec<u8> = std::fs::read(path).map_err(|_| Error::IOError)?;
         self.load_rom_bytes(rom_data.as_slice())
     }
 
@@ -416,13 +422,10 @@ impl Oxid8 {
     /// # Errors
     ///
     /// If there is any issue loading the ROM, then an error is returned.
-    pub fn load_rom_bytes(&mut self, rom_data: &[u8]) -> io::Result<()> {
+    pub fn load_rom_bytes(&mut self, rom_data: &[u8]) -> Result<(), Error> {
         let len = rom_data.len();
         if len > (RAM_SIZE - START_ADDR as usize) {
-            return Err(io::Error::new(
-                io::ErrorKind::FileTooLarge,
-                format!("ROM too large: {}", len),
-            ));
+            return Err(Error::RomTooLarge { size: len });
         }
 
         #[rustfmt::skip]
@@ -650,13 +653,13 @@ impl Oxid8 {
                 if x + j >= SCREEN_WIDTH {
                     break; // clip
                 }
-                let ref mut pixel_ref = self.screen[pixel_posn + j];
-                let old_pixel = *pixel_ref;
+                let pixel = &mut self.screen[pixel_posn + j];
+                let old_pixel = *pixel;
 
                 let sprite_pixel = (sprite_row >> (0x7 - j)) & 0x1;
-                *pixel_ref ^= sprite_pixel != 0;
+                *pixel ^= sprite_pixel != 0;
 
-                if !(*pixel_ref) && old_pixel {
+                if !(*pixel) && old_pixel {
                     self.v_reg[VF] = 1; // turn on collision flag
                 }
             }
@@ -749,7 +752,7 @@ impl Oxid8 {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
 
@@ -788,12 +791,11 @@ mod tests {
         emu.ram[START_ADDR as usize] = 0xFF;
         emu.ram[START_ADDR as usize + 1] = 0xFF;
 
-        #[rustfmt::skip]
-        assert!(emu.run_cycle().is_err_and(|msg| msg
-            == format!(
-                "Invalid Instruction: FFFF at {}",
-                START_ADDR
-            )))
+        assert!(emu.run_cycle().is_err_and(|e| e
+            == Error::InvalidOpcode {
+                opcode: 0xFFFF,
+                pc: START_ADDR
+            }))
     }
 
     #[test]
