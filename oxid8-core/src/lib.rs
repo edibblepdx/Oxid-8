@@ -191,13 +191,13 @@ impl Opcode {
     }
 
     /// A 4-bit value, the lower 4 bits of the high byte of the instruction.
-    fn x(&self) -> u8 {
-        self.1
+    fn x(&self) -> usize {
+        self.1 as usize
     }
 
     /// A 4-bit value, the upper 4 bits of the low byte of the instruction.
-    fn y(&self) -> u8 {
-        self.2
+    fn y(&self) -> usize {
+        self.2 as usize
     }
 
     /// An 8-bit value, the lowest 8 bits of the instruction.
@@ -306,48 +306,43 @@ impl Oxid8 {
             },
             0x1 => self.jp_nnn(opcode.nnn()),
             0x2 => self.call(opcode.nnn()),
-            0x3 => self.se_xkk(opcode.x() as usize, opcode.kk()),
-            0x4 => self.sne_xkk(opcode.x() as usize, opcode.kk()),
-            0x5 => self.se_xy(opcode.x() as usize, opcode.y() as usize),
-            0x6 => self.ld_xkk(opcode.x() as usize, opcode.kk()),
-            0x7 => self.add_xkk(opcode.x() as usize, opcode.kk()),
+            0x3 => self.se_xkk(opcode.x(), opcode.kk()),
+            0x4 => self.sne_xkk(opcode.x(), opcode.kk()),
+            0x5 => self.se_xy(opcode.x(), opcode.y()),
+            0x6 => self.ld_xkk(opcode.x(), opcode.kk()),
+            0x7 => self.add_xkk(opcode.x(), opcode.kk()),
             0x8 => match opcode.n() {
-                0x0 => self.ld_xy(opcode.x() as usize, opcode.y() as usize),
-                0x1 => self.or(opcode.x() as usize, opcode.y() as usize),
-                0x2 => self.and(opcode.x() as usize, opcode.y() as usize),
-                0x3 => self.xor(opcode.x() as usize, opcode.y() as usize),
-                0x4 => self.add_xy(opcode.x() as usize, opcode.y() as usize),
-                0x5 => self.sub_xy(opcode.x() as usize, opcode.y() as usize),
-                0x6 => self.shr(opcode.x() as usize, opcode.y() as usize),
-                0x7 => self.subn_xy(opcode.x() as usize, opcode.y() as usize),
-                0xE => self.shl(opcode.x() as usize, opcode.y() as usize),
+                0x0 => self.ld_xy(opcode.x(), opcode.y()),
+                0x1 => self.or(opcode.x(), opcode.y()),
+                0x2 => self.and(opcode.x(), opcode.y()),
+                0x3 => self.xor(opcode.x(), opcode.y()),
+                0x4 => self.add_xy(opcode.x(), opcode.y()),
+                0x5 => self.sub_xy(opcode.x(), opcode.y()),
+                0x6 => self.shr(opcode.x(), opcode.y()),
+                0x7 => self.subn_xy(opcode.x(), opcode.y()),
+                0xE => self.shl(opcode.x(), opcode.y()),
                 _ => invalid()?,
             },
-            0x9 => self.sne_xy(opcode.x() as usize, opcode.y() as usize),
+            0x9 => self.sne_xy(opcode.x(), opcode.y()),
             0xA => self.ld_innn(opcode.nnn()),
             0xB => self.jp_0nnn(opcode.nnn()),
-            0xC => self.rnd(opcode.x() as usize, opcode.kk()),
-            #[rustfmt::skip]
-            0xD => self.drw(
-                opcode.x() as usize,
-                opcode.y() as usize,
-                opcode.n(),
-            ),
+            0xC => self.rnd(opcode.x(), opcode.kk()),
+            0xD => self.drw(opcode.x(), opcode.y(), opcode.n()),
             0xE => match opcode.kk() {
-                0x9E => self.skp(opcode.x() as usize),
-                0xA1 => self.sknp(opcode.x() as usize),
+                0x9E => self.skp(opcode.x()),
+                0xA1 => self.sknp(opcode.x()),
                 _ => invalid()?,
             },
             0xF => match opcode.kk() {
-                0x07 => self.ld_xdt(opcode.x() as usize),
-                0x0A => self.ld_xk(opcode.x() as usize),
-                0x15 => self.ld_dtx(opcode.x() as usize),
-                0x18 => self.ld_stx(opcode.x() as usize),
-                0x1E => self.add_ix(opcode.x() as usize),
-                0x29 => self.ld_fx(opcode.x() as usize),
-                0x33 => self.ld_bx(opcode.x() as usize),
-                0x55 => self.ld_ix(opcode.x() as usize),
-                0x65 => self.ld_xi(opcode.x() as usize),
+                0x07 => self.ld_xdt(opcode.x()),
+                0x0A => self.ld_xk(opcode.x()),
+                0x15 => self.ld_dtx(opcode.x()),
+                0x18 => self.ld_stx(opcode.x()),
+                0x1E => self.add_ix(opcode.x()),
+                0x29 => self.ld_fx(opcode.x()),
+                0x33 => self.ld_bx(opcode.x()),
+                0x55 => self.ld_ix(opcode.x()),
+                0x65 => self.ld_xi(opcode.x()),
                 _ => invalid()?,
             },
             _ => invalid()?,
@@ -398,7 +393,8 @@ impl Oxid8 {
 
     /// Instructs the interpreter to load the fontset.
     pub fn load_font(&mut self) {
-        self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)] //
+        #[rustfmt::skip]
+        self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)]
             .copy_from_slice(&FONTSET);
     }
 
@@ -428,7 +424,8 @@ impl Oxid8 {
             ));
         }
 
-        self.ram[START_ADDR as usize..(START_ADDR as usize + len)] //
+        #[rustfmt::skip]
+        self.ram[START_ADDR as usize..(START_ADDR as usize + len)]
             .copy_from_slice(rom_data);
 
         Ok(())
@@ -789,10 +786,12 @@ mod tests {
         let mut emu = Oxid8::new();
         emu.ram[START_ADDR as usize] = 0xFF;
         emu.ram[START_ADDR as usize + 1] = 0xFF;
+
+        #[rustfmt::skip]
         assert!(emu.run_cycle().is_err_and(|msg| msg
             == format!(
-                "Invalid Instruction: FFFF at {}", //
-                START_ADDR                         //
+                "Invalid Instruction: FFFF at {}",
+                START_ADDR
             )))
     }
 
@@ -837,13 +836,15 @@ mod tests {
     fn draw_basic() {
         // Largest drawable sprite.
         // Just two 'X' on top of each other sized 8x15.
+        #[rustfmt::skip]
         let sprite = [
-            0x81, 0x42, 0x24, 0x18, //
-            0x18, 0x24, 0x42, 0x81, //
-            0x42, 0x24, 0x18, 0x18, //
-            0x24, 0x42, 0x81, //
+            0x81, 0x42, 0x24, 0x18,
+            0x18, 0x24, 0x42, 0x81,
+            0x42, 0x24, 0x18, 0x18,
+            0x24, 0x42, 0x81,
         ];
 
+        #[rustfmt::skip]
         let screen = [
             true, false, false, false, false, false, false, true, // 1
             false, true, false, false, false, false, true, false, // 2
