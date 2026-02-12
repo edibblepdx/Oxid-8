@@ -360,12 +360,8 @@ impl Oxid8 {
     /// Use `next_frame` instead if you don't want to
     /// control cpu speed.
     pub fn dec_timers(&mut self) {
-        if self.dt > 0 {
-            self.dt -= 1;
-        }
-        if self.st > 0 {
-            self.st -= 1;
-        }
+        self.dt = self.dt.max(1) - 1;
+        self.st = self.st.max(1) - 1;
     }
 
     /// Returns true if sound timer is zero.
