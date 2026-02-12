@@ -85,6 +85,8 @@
 //! [web-time](https://crates.io/crates/web-time) crate when compiling to
 //! web assembly.
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
 use rand::{Rng, rng, rngs::ThreadRng};
 use std::{fmt, io, time::Duration};
 
@@ -204,8 +206,9 @@ impl Opcode {
     }
 }
 
+#[cfg(feature = "std")]
 /// Formatted as "(byte1, byte2, byte3, byte4)"
-impl fmt::Display for Opcode {
+impl std::fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}, {}, {}, {})", self.0, self.1, self.2, self.3)
     }
@@ -278,9 +281,10 @@ impl Oxid8 {
     /// perform an invalid action. Otherwise the interpreter
     /// can be left in an invalid state. The rom is bad.
     pub fn run_cycle(&mut self) -> Result<(), String> {
+        #[rustfmt::skip]
         let opcode = Opcode::new(
-            self.ram[self.pc as usize],     //
-            self.ram[self.pc as usize + 1], //
+            self.ram[self.pc as usize],
+            self.ram[self.pc as usize + 1],
         );
 
         let pc_at_err = self.pc;
@@ -323,13 +327,12 @@ impl Oxid8 {
             0xA => self.ld_innn(opcode.nnn()),
             0xB => self.jp_0nnn(opcode.nnn()),
             0xC => self.rnd(opcode.x() as usize, opcode.kk()),
-            0xD => {
-                self.drw(
-                    opcode.x() as usize, //
-                    opcode.y() as usize, //
-                    opcode.n(),          //
-                );
-            }
+            #[rustfmt::skip]
+            0xD => self.drw(
+                opcode.x() as usize,
+                opcode.y() as usize,
+                opcode.n(),
+            ),
             0xE => match opcode.kk() {
                 0x9E => self.skp(opcode.x() as usize),
                 0xA1 => self.sknp(opcode.x() as usize),

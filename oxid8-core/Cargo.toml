@@ -13,3 +13,7 @@ homepage = "https://edibblepdx.github.io/Oxid-8/"
 
 [dependencies]
 rand = "0.9.1"
+
+[features]
+default = ["std"]
+std = []
