@@ -12,7 +12,8 @@ keywords = ["chip-8", "emulator"]
 homepage = "https://edibblepdx.github.io/Oxid-8/"
 
 [dependencies]
-rand = "0.9.1"
+rand_core = "0.10.0"
+rand_pcg = "0.10.1"
 
 [features]
 default = ["std"]

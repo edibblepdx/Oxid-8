@@ -87,15 +87,20 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use rand::{Rng, rng, rngs::ThreadRng};
-use std::{fmt, time::Duration};
+#[cfg(feature = "std")]
+use std::time::Duration;
+
+use rand_core::{Rng, SeedableRng};
+use rand_pcg::Pcg64Mcg;
 
 /// Standard CPU tick rate set to 700Hz. This value is not used internally.
 /// Run a CPU cycle this often.
+#[cfg(feature = "std")]
 pub const CPU_TICK: Duration = Duration::from_micros(1430);
 
 /// Standard TIMER tick rate set to 60Hz. This value is not used internally.
 /// Decrement the timers and refresh the display this often.
+#[cfg(feature = "std")]
 pub const TIMER_TICK: Duration = Duration::from_micros(16667);
 
 /// Virtual screen width (64 pixels).
@@ -173,7 +178,7 @@ pub struct Oxid8 {
     stored_key: Option<usize>,   // Stored key
     dt: u8,                      // Delay Timer
     st: u8,                      // Sound Timer
-    rng: ThreadRng,              // RNG
+    rng: Pcg64Mcg,               // RNG
 }
 
 /// 4-byte opcode.
@@ -222,7 +227,7 @@ impl Opcode {
 #[cfg(feature = "std")]
 /// Formatted as "(byte1, byte2, byte3, byte4)"
 impl std::fmt::Display for Opcode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "({}, {}, {}, {})", self.0, self.1, self.2, self.3)
     }
 }
@@ -230,8 +235,21 @@ impl std::fmt::Display for Opcode {
 /// Oxid8 Core
 impl Oxid8 {
     /// Create a new oxid8 instance.
-    pub fn new() -> Self {
-        Oxid8::default()
+    pub fn new(seed: u64) -> Self {
+        Self {
+            pc: START_ADDR,
+            ram: [0; RAM_SIZE],
+            screen: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
+            v_reg: [0; NUM_REGS],
+            i_reg: 0,
+            sp: 0,
+            stack: [0; STACK_SIZE],
+            keys: [false; NUM_KEYS],
+            stored_key: None,
+            dt: 0,
+            st: 0,
+            rng: Pcg64Mcg::seed_from_u64(seed),
+        }
     }
 
     /// Reset all parameters to default.
@@ -468,20 +486,7 @@ impl Oxid8 {
 
 impl Default for Oxid8 {
     fn default() -> Self {
-        Self {
-            pc: START_ADDR,
-            ram: [0; RAM_SIZE],
-            screen: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
-            v_reg: [0; NUM_REGS],
-            i_reg: 0,
-            sp: 0,
-            stack: [0; STACK_SIZE],
-            keys: [false; NUM_KEYS],
-            stored_key: None,
-            dt: 0,
-            st: 0,
-            rng: rng(),
-        }
+        Self::new(0)
     }
 }
 
@@ -625,7 +630,7 @@ impl Oxid8 {
 
     /// Cxkk - Set Vx = random byte AND kk.
     fn rnd(&mut self, x: usize, kk: u8) {
-        self.v_reg[x] = self.rng.random_range(0..=0xFF) as u8 & kk;
+        self.v_reg[x] = self.rng.next_u32() as u8 & kk;
     }
 
     /// Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
@@ -787,7 +792,7 @@ mod tests {
 
     #[test]
     fn invalid_opcode() {
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
         emu.ram[START_ADDR as usize] = 0xFF;
         emu.ram[START_ADDR as usize + 1] = 0xFF;
 
@@ -800,7 +805,7 @@ mod tests {
 
     #[test]
     fn push_pop() {
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
         assert_eq!(emu.sp, 0); // base stack pointer
         emu.push(1); // push
         assert_eq!(emu.sp, 1); // inc stack pointer
@@ -812,7 +817,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Stack Overflow")]
     fn push_panic() {
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
         for _ in 0..=STACK_SIZE {
             emu.push(1);
         }
@@ -821,13 +826,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "Stack Underflow")]
     fn pop_panic() {
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
         emu.pop();
     }
 
     #[test]
     fn load_font() {
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
         emu.load_font();
         assert_eq!(
             emu.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)],
@@ -866,7 +871,7 @@ mod tests {
             true, false, false, false, false, false, false, true, // 15
         ];
 
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
 
         emu.i_reg = START_ADDR;
         let start = START_ADDR as usize;
