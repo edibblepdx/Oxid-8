@@ -1,0 +1,125 @@
+/* Basic reset for body */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+    font-size: large;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; /* Full viewport height */
+    background-color: #222222;
+}
+
+/* Container for centering content */
+.container {
+    background-color: #2a2a2a;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    max-width: 80%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    border: 1px solid #3f3f3f;
+    color: lightgray;
+    margin: 15px;
+}
+
+.keypad {
+    display: inline-grid;
+    grid-template-columns: auto auto auto auto;
+    gap: 5px;
+}
+
+.hide { display: none; }
+@media only screen and (max-width: 40rem) {
+    .hide {
+        display: flex;
+    }
+}
+
+.keypad div {
+    text-align: center;
+}
+
+.keypad button {
+    margin: 0;
+    width: 80px;
+    height: 60px;
+    border-radius: 10px;
+    border: 2px solid #3f3f3f;
+    font-size: x-large;
+    font-weight: bold;
+    background-color: white;
+}
+
+.keypad button:active {
+    background-color: #a2a2a2;
+}
+
+.keypad button.pressed {
+    background-color: #a2a2a2;
+}
+
+h4 {
+    margin: 0;
+}
+
+canvas {
+    display: block;
+    background: black;
+    /* Big border to make the screen look sunken */
+    border: 10px solid transparent;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 8px;
+}
+
+input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #3f3f3f;
+    border-radius: 8px;
+    color: gray;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Basic styling for the file input button, as default browser styles vary */
+input[type="file"]::-webkit-file-upload-button {
+    margin-right: 16px;
+    padding: 8px 16px;
+    border-radius: 9999px;
+    border: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    background-color: white;
+    color: black;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+input[type="file"]::-webkit-file-upload-button:hover {
+    background-color: gray;
+}
+
+/* Firefox specific styling */
+input[type="file"]::file-selector-button {
+    margin-right: 16px;
+    padding: 8px 16px;
+    border-radius: 9999px;
+    border: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    background-color: white;
+    color: black;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+input[type="file"]::file-selector-button:hover {
+    background-color: gray;
+}

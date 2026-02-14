@@ -1,0 +1,24 @@
+{
+  "name": "oxid8-wgpu",
+  "type": "module",
+  "collaborators": [
+    "Ethan Dibble <edibble@pdx.edu>"
+  ],
+  "description": "WASM bindings for oxid8-core.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edibblepdx/Oxid-8"
+  },
+  "files": [
+    "oxid8_wgpu_bg.wasm",
+    "oxid8_wgpu.js",
+    "oxid8_wgpu.d.ts"
+  ],
+  "main": "oxid8_wgpu.js",
+  "types": "oxid8_wgpu.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

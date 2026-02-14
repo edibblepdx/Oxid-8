@@ -6,18 +6,103 @@
 //!
 //! This is the core interpreter library for `Oxid8`. So that developers can
 //! create their own renderers on top of this library crate.
+//!
+//! # Getting Started
+//!
+//! ```no_run
+//! use oxid8_core::Oxid8;
+//! use std::time::{Duration, Instant};
+//!
+//! #[derive(Default)]
+//! struct State {
+//!     should_exit: bool,
+//!     last_frame: Option<Instant>,
+//! }
+//!
+//! #[derive(Default)]
+//! struct Emu {
+//!     state: State,
+//!     core: Oxid8,
+//! }
+//!
+//! fn main() -> Result<(), oxid8_core::Error> {
+//!     let mut emu = Emu::default();
+//!     emu.core.load_font();
+//!     emu.core.load_rom("rom_path")?;
+//!
+//!     while !emu.state.should_exit {
+//!         let time = Instant::now();
+//!
+//!         // TODO: Poll and Handle Events.
+//!
+//!         if let Some(last_frame) = emu.state.last_frame {
+//!             if time.duration_since(last_frame) >= Duration::from_millis(16) {
+//!                 if let Err(err) = emu.core.next_frame() {
+//!                     panic!("{err:?}");
+//!                 }
+//!
+//!                 // TODO: Draw current frame.
+//!
+//!                 emu.state.last_frame = Some(time);
+//!             }
+//!
+//!             if emu.core.sound() {
+//!                 // TODO: Beep!
+//!             }
+//!
+//!         } else {
+//!             emu.state.last_frame = Some(Instant::now());
+//!         }
+//!     }
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! # WASM Compatibility
+//!
+//! ```toml
+//! # Cargo.toml
+//!
+//! [dependencies]
+//! web-time = "1.1.0"
+//!
+//! [target.'cfg(target_arch = "wasm32")'.dependencies]
+//! getrandom = { version = "0.3", features = ["wasm_js"] }
+//! ```
+//!
+//! ```toml
+//! # config.toml
+//!
+//! [target.'cfg(target_arch = "wasm32")']
+//! rustflags = ["--cfg", 'getrandom_backend="wasm_js"']
+//! ```
+//!
+//! # Frame Time
+//!
+//! You should generate frames at 60Hz or roughly 16ms if not relying on
+//! vsync. `std::time::{Instant, Duration}` panic in the web so use the
+//! [web-time](https://crates.io/crates/web-time) crate when compiling to
+//! web assembly.
 
-use rand::{Rng, rng, rngs::ThreadRng};
-use std::{fmt, io, time::Duration};
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(feature = "std")]
+use std::time::Duration;
+
+use rand_core::{Rng, SeedableRng};
+use rand_pcg::Pcg64Mcg;
 
 mod screen;
 
 /// Standard CPU tick rate set to 700Hz. This value is not used internally.
 /// Run a CPU cycle this often.
+#[cfg(feature = "std")]
 pub const CPU_TICK: Duration = Duration::from_micros(1430);
 
 /// Standard TIMER tick rate set to 60Hz. This value is not used internally.
 /// Decrement the timers and refresh the display this often.
+#[cfg(feature = "std")]
 pub const TIMER_TICK: Duration = Duration::from_micros(16667);
 
 /// Virtual screen width (64 pixels).
@@ -35,7 +120,7 @@ const FONTSET_SIZE: usize = 80;
 const FONT_ADDR: u16 = 0x050;
 
 // Some games may behave differently based on the font.
-// This is the most common font that I see.
+// This font set is common.
 const FONTSET: [u8; FONTSET_SIZE] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -62,6 +147,19 @@ const NUM_KEYS: usize = 16;
 const VF: usize = 15;
 const START_ADDR: u16 = 0x200;
 
+#[derive(Debug, PartialEq)]
+pub enum Error {
+    InvalidOpcode {
+        opcode: u16,
+        pc: u16,
+    },
+    RomTooLarge {
+        size: usize,
+    },
+    #[cfg(feature = "std")]
+    IOError,
+}
+
 #[derive(Debug)]
 struct Opcode(u8, u8, u8, u8);
 
@@ -82,7 +180,8 @@ pub struct Oxid8 {
     stored_key: Option<usize>,   // Stored key
     dt: u8,                      // Delay Timer
     st: u8,                      // Sound Timer
-    rng: ThreadRng,              // RNG
+    rng: Pcg64Mcg,               // Rng
+    seed: u64,                   // Rng seed
 }
 
 /// 4-byte opcode.
@@ -113,13 +212,13 @@ impl Opcode {
     }
 
     /// A 4-bit value, the lower 4 bits of the high byte of the instruction.
-    fn x(&self) -> u8 {
-        self.1
+    fn x(&self) -> usize {
+        self.1 as usize
     }
 
     /// A 4-bit value, the upper 4 bits of the low byte of the instruction.
-    fn y(&self) -> u8 {
-        self.2
+    fn y(&self) -> usize {
+        self.2 as usize
     }
 
     /// An 8-bit value, the lowest 8 bits of the instruction.
@@ -128,9 +227,10 @@ impl Opcode {
     }
 }
 
+#[cfg(feature = "std")]
 /// Formatted as "(byte1, byte2, byte3, byte4)"
-impl fmt::Display for Opcode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for Opcode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "({}, {}, {}, {})", self.0, self.1, self.2, self.3)
     }
 }
@@ -138,21 +238,71 @@ impl fmt::Display for Opcode {
 /// Oxid8 Core
 impl Oxid8 {
     /// Create a new oxid8 instance.
-    pub fn new() -> Self {
-        Oxid8::default()
+    pub fn new(seed: u64) -> Self {
+        Self {
+            pc: START_ADDR,
+            ram: [0; RAM_SIZE],
+            screen: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
+            v_reg: [0; NUM_REGS],
+            i_reg: 0,
+            sp: 0,
+            stack: [0; STACK_SIZE],
+            keys: [false; NUM_KEYS],
+            stored_key: None,
+            dt: 0,
+            st: 0,
+            rng: Pcg64Mcg::seed_from_u64(seed),
+            seed: seed,
+        }
     }
 
-    // TODO: panic hook example to reset emulator
-    // when a user uploads a bad rom so that they
-    // can try a different one.
-
-    /// Reset all parameters to default.
-    /// Must call `load_font` to reload font.
+    /// Reset all parameters to default. Notably:
+    /// Ram is cleared and the rng uses the same seed.
+    ///
+    /// Must reload font [`Oxid8::load_font`].
+    /// Must reload rom [`Oxid8::load_rom_bytes`].
     pub fn reset(&mut self) {
-        *self = Oxid8::default();
+        *self = Self::new(self.seed);
+    }
+
+    /// Emulates a full frame.
+    ///
+    /// Each frame emulates 10 cpu cycles and decrements
+    /// the sound and delay timers. If your frame time is
+    /// 60Hz, cpu cycles run at 600Hz and timers at 60Hz.
+    /// CHIP-8 cpu cycles have historically ran anywhere
+    /// between 500Hz to 700Hz depending on hardware and
+    /// implementation. If you want finer control over
+    /// cpu speeds use call `run_cycle` yourself, and
+    /// call `dec_timers` at a rate of 16ms.
+    ///
+    /// # Errors
+    ///
+    /// Invalid opcodes will cause `frame` to return
+    /// an error string with the full opcode and program
+    /// counter at that point. The rom is bad.
+    ///
+    /// # Panics
+    ///
+    /// `push` and `pop` instructions can panic with a
+    /// Stack Overflow/Underflow error.
+    ///
+    /// Other opcodes may panic if the game attempts to
+    /// perform an invalid action. Otherwise the interpreter
+    /// can be left in an invalid state. The rom is bad.
+    pub fn next_frame(&mut self) -> Result<(), Error> {
+        for _ in 0..10 {
+            self.run_cycle()?;
+        }
+        self.dec_timers();
+
+        Ok(())
     }
 
     /// Emulates a single cycle.
+    ///
+    /// Use `next_frame` instead if you don't want to
+    /// control cpu speed.
     ///
     /// # Errors
     ///
@@ -168,21 +318,21 @@ impl Oxid8 {
     /// Other opcodes may panic if the game attempts to
     /// perform an invalid action. Otherwise the interpreter
     /// can be left in an invalid state. The rom is bad.
-    pub fn run_cycle(&mut self) -> Result<(), String> {
+    pub fn run_cycle(&mut self) -> Result<(), Error> {
+        #[rustfmt::skip]
         let opcode = Opcode::new(
-            self.ram[self.pc as usize],     //
-            self.ram[self.pc as usize + 1], //
+            self.ram[self.pc as usize],
+            self.ram[self.pc as usize + 1],
         );
 
         let pc_at_err = self.pc;
         self.pc += 2;
 
-        let invalid = || -> Result<(), String> {
-            Err(format!(
-                "Invalid Instruction: {:04X} at {}",
-                opcode.full(),
-                pc_at_err,
-            ))
+        let invalid = || -> Result<(), Error> {
+            Err(Error::InvalidOpcode {
+                opcode: opcode.full(),
+                pc: pc_at_err,
+            })
         };
 
         match opcode.0 {
@@ -193,64 +343,58 @@ impl Oxid8 {
             },
             0x1 => self.jp_nnn(opcode.nnn()),
             0x2 => self.call(opcode.nnn()),
-            0x3 => self.se_xkk(opcode.x() as usize, opcode.kk()),
-            0x4 => self.sne_xkk(opcode.x() as usize, opcode.kk()),
-            0x5 => self.se_xy(opcode.x() as usize, opcode.y() as usize),
-            0x6 => self.ld_xkk(opcode.x() as usize, opcode.kk()),
-            0x7 => self.add_xkk(opcode.x() as usize, opcode.kk()),
+            0x3 => self.se_xkk(opcode.x(), opcode.kk()),
+            0x4 => self.sne_xkk(opcode.x(), opcode.kk()),
+            0x5 => self.se_xy(opcode.x(), opcode.y()),
+            0x6 => self.ld_xkk(opcode.x(), opcode.kk()),
+            0x7 => self.add_xkk(opcode.x(), opcode.kk()),
             0x8 => match opcode.n() {
-                0x0 => self.ld_xy(opcode.x() as usize, opcode.y() as usize),
-                0x1 => self.or(opcode.x() as usize, opcode.y() as usize),
-                0x2 => self.and(opcode.x() as usize, opcode.y() as usize),
-                0x3 => self.xor(opcode.x() as usize, opcode.y() as usize),
-                0x4 => self.add_xy(opcode.x() as usize, opcode.y() as usize),
-                0x5 => self.sub_xy(opcode.x() as usize, opcode.y() as usize),
-                0x6 => self.shr(opcode.x() as usize, opcode.y() as usize),
-                0x7 => self.subn_xy(opcode.x() as usize, opcode.y() as usize),
-                0xE => self.shl(opcode.x() as usize, opcode.y() as usize),
+                0x0 => self.ld_xy(opcode.x(), opcode.y()),
+                0x1 => self.or(opcode.x(), opcode.y()),
+                0x2 => self.and(opcode.x(), opcode.y()),
+                0x3 => self.xor(opcode.x(), opcode.y()),
+                0x4 => self.add_xy(opcode.x(), opcode.y()),
+                0x5 => self.sub_xy(opcode.x(), opcode.y()),
+                0x6 => self.shr(opcode.x(), opcode.y()),
+                0x7 => self.subn_xy(opcode.x(), opcode.y()),
+                0xE => self.shl(opcode.x(), opcode.y()),
                 _ => invalid()?,
             },
-            0x9 => self.sne_xy(opcode.x() as usize, opcode.y() as usize),
+            0x9 => self.sne_xy(opcode.x(), opcode.y()),
             0xA => self.ld_innn(opcode.nnn()),
             0xB => self.jp_0nnn(opcode.nnn()),
-            0xC => self.rnd(opcode.x() as usize, opcode.kk()),
-            0xD => {
-                self.drw(
-                    opcode.x() as usize, //
-                    opcode.y() as usize, //
-                    opcode.n(),          //
-                );
-            }
+            0xC => self.rnd(opcode.x(), opcode.kk()),
+            0xD => self.drw(opcode.x(), opcode.y(), opcode.n()),
             0xE => match opcode.kk() {
-                0x9E => self.skp(opcode.x() as usize),
-                0xA1 => self.sknp(opcode.x() as usize),
+                0x9E => self.skp(opcode.x()),
+                0xA1 => self.sknp(opcode.x()),
                 _ => invalid()?,
             },
             0xF => match opcode.kk() {
-                0x07 => self.ld_xdt(opcode.x() as usize),
-                0x0A => self.ld_xk(opcode.x() as usize),
-                0x15 => self.ld_dtx(opcode.x() as usize),
-                0x18 => self.ld_stx(opcode.x() as usize),
-                0x1E => self.add_ix(opcode.x() as usize),
-                0x29 => self.ld_fx(opcode.x() as usize),
-                0x33 => self.ld_bx(opcode.x() as usize),
-                0x55 => self.ld_ix(opcode.x() as usize),
-                0x65 => self.ld_xi(opcode.x() as usize),
+                0x07 => self.ld_xdt(opcode.x()),
+                0x0A => self.ld_xk(opcode.x()),
+                0x15 => self.ld_dtx(opcode.x()),
+                0x18 => self.ld_stx(opcode.x()),
+                0x1E => self.add_ix(opcode.x()),
+                0x29 => self.ld_fx(opcode.x()),
+                0x33 => self.ld_bx(opcode.x()),
+                0x55 => self.ld_ix(opcode.x()),
+                0x65 => self.ld_xi(opcode.x()),
                 _ => invalid()?,
             },
             _ => invalid()?,
         }
+
         Ok(())
     }
 
     /// Decrements the delay and sound and timers.
+    ///
+    /// Use `next_frame` instead if you don't want to
+    /// control cpu speed.
     pub fn dec_timers(&mut self) {
-        if self.dt > 0 {
-            self.dt -= 1;
-        }
-        if self.st > 0 {
-            self.st -= 1;
-        }
+        self.dt = self.dt.max(1) - 1;
+        self.st = self.st.max(1) - 1;
     }
 
     /// Returns true if sound timer is zero.
@@ -282,7 +426,8 @@ impl Oxid8 {
 
     /// Instructs the interpreter to load the fontset.
     pub fn load_font(&mut self) {
-        self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)] //
+        #[rustfmt::skip]
+        self.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)]
             .copy_from_slice(&FONTSET);
     }
 
@@ -291,10 +436,9 @@ impl Oxid8 {
     /// # Errors
     ///
     /// If there is any issue loading the ROM, then an error is returned.
-    pub fn load_rom_path(&mut self, path: impl AsRef<std::path::Path>) -> io::Result<()> {
-        use std::fs;
-
-        let rom_data: Vec<u8> = fs::read(path)?;
+    #[cfg(feature = "std")]
+    pub fn load_rom(&mut self, path: impl AsRef<std::path::Path>) -> Result<(), Error> {
+        let rom_data: Vec<u8> = std::fs::read(path).map_err(|_| Error::IOError)?;
         self.load_rom_bytes(rom_data.as_slice())
     }
 
@@ -303,16 +447,14 @@ impl Oxid8 {
     /// # Errors
     ///
     /// If there is any issue loading the ROM, then an error is returned.
-    pub fn load_rom_bytes(&mut self, rom_data: &[u8]) -> io::Result<()> {
+    pub fn load_rom_bytes(&mut self, rom_data: &[u8]) -> Result<(), Error> {
         let len = rom_data.len();
         if len > (RAM_SIZE - START_ADDR as usize) {
-            return Err(io::Error::new(
-                io::ErrorKind::FileTooLarge,
-                format!("ROM too large: {}", len),
-            ));
+            return Err(Error::RomTooLarge { size: len });
         }
 
-        self.ram[START_ADDR as usize..(START_ADDR as usize + len)] //
+        #[rustfmt::skip]
+        self.ram[START_ADDR as usize..(START_ADDR as usize + len)]
             .copy_from_slice(rom_data);
 
         Ok(())
@@ -350,21 +492,9 @@ impl Oxid8 {
 }
 
 impl Default for Oxid8 {
+    /// Creates a new [`Oxid8`] instance with a default seed of 0.
     fn default() -> Self {
-        Self {
-            pc: START_ADDR,
-            ram: [0; RAM_SIZE],
-            screen: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
-            v_reg: [0; NUM_REGS],
-            i_reg: 0,
-            sp: 0,
-            stack: [0; STACK_SIZE],
-            keys: [false; NUM_KEYS],
-            stored_key: None,
-            dt: 0,
-            st: 0,
-            rng: rng(),
-        }
+        Self::new(0)
     }
 }
 
@@ -508,7 +638,7 @@ impl Oxid8 {
 
     /// Cxkk - Set Vx = random byte AND kk.
     fn rnd(&mut self, x: usize, kk: u8) {
-        self.v_reg[x] = self.rng.random_range(0..=0xFF) as u8 & kk;
+        self.v_reg[x] = self.rng.next_u32() as u8 & kk;
     }
 
     /// Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy),
@@ -536,13 +666,13 @@ impl Oxid8 {
                 if x + j >= SCREEN_WIDTH {
                     break; // clip
                 }
-                let ref mut pixel_ref = self.screen[pixel_posn + j];
-                let old_pixel = *pixel_ref;
+                let pixel = &mut self.screen[pixel_posn + j];
+                let old_pixel = *pixel;
 
                 let sprite_pixel = (sprite_row >> (0x7 - j)) & 0x1;
-                *pixel_ref ^= sprite_pixel != 0;
+                *pixel ^= sprite_pixel != 0;
 
-                if !(*pixel_ref) && old_pixel {
+                if !(*pixel) && old_pixel {
                     self.v_reg[VF] = 1; // turn on collision flag
                 }
             }
@@ -635,7 +765,7 @@ impl Oxid8 {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
 
@@ -670,19 +800,20 @@ mod tests {
 
     #[test]
     fn invalid_opcode() {
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
         emu.ram[START_ADDR as usize] = 0xFF;
         emu.ram[START_ADDR as usize + 1] = 0xFF;
-        assert!(emu.run_cycle().is_err_and(|msg| msg
-            == format!(
-                "Invalid Instruction: FFFF at {}", //
-                START_ADDR                         //
-            )))
+
+        assert!(emu.run_cycle().is_err_and(|e| e
+            == Error::InvalidOpcode {
+                opcode: 0xFFFF,
+                pc: START_ADDR
+            }))
     }
 
     #[test]
     fn push_pop() {
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
         assert_eq!(emu.sp, 0); // base stack pointer
         emu.push(1); // push
         assert_eq!(emu.sp, 1); // inc stack pointer
@@ -694,7 +825,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Stack Overflow")]
     fn push_panic() {
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
         for _ in 0..=STACK_SIZE {
             emu.push(1);
         }
@@ -703,13 +834,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "Stack Underflow")]
     fn pop_panic() {
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
         emu.pop();
     }
 
     #[test]
     fn load_font() {
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
         emu.load_font();
         assert_eq!(
             emu.ram[FONT_ADDR as usize..(FONT_ADDR as usize + FONTSET_SIZE)],
@@ -721,13 +852,15 @@ mod tests {
     fn draw_basic() {
         // Largest drawable sprite.
         // Just two 'X' on top of each other sized 8x15.
+        #[rustfmt::skip]
         let sprite = [
-            0x81, 0x42, 0x24, 0x18, //
-            0x18, 0x24, 0x42, 0x81, //
-            0x42, 0x24, 0x18, 0x18, //
-            0x24, 0x42, 0x81, //
+            0x81, 0x42, 0x24, 0x18,
+            0x18, 0x24, 0x42, 0x81,
+            0x42, 0x24, 0x18, 0x18,
+            0x24, 0x42, 0x81,
         ];
 
+        #[rustfmt::skip]
         let screen = [
             true, false, false, false, false, false, false, true, // 1
             false, true, false, false, false, false, true, false, // 2
@@ -746,7 +879,7 @@ mod tests {
             true, false, false, false, false, false, false, true, // 15
         ];
 
-        let mut emu = Oxid8::new();
+        let mut emu = Oxid8::default();
 
         emu.i_reg = START_ADDR;
         let start = START_ADDR as usize;
