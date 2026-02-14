@@ -178,7 +178,8 @@ pub struct Oxid8 {
     stored_key: Option<usize>,   // Stored key
     dt: u8,                      // Delay Timer
     st: u8,                      // Sound Timer
-    rng: Pcg64Mcg,               // RNG
+    rng: Pcg64Mcg,               // Rng
+    seed: u64,                   // Rng seed
 }
 
 /// 4-byte opcode.
@@ -249,13 +250,17 @@ impl Oxid8 {
             dt: 0,
             st: 0,
             rng: Pcg64Mcg::seed_from_u64(seed),
+            seed: seed,
         }
     }
 
-    /// Reset all parameters to default.
-    /// Must call `load_font` to reload font.
+    /// Reset all parameters to default. Notably:
+    /// Ram is cleared and the rng uses the same seed.
+    ///
+    /// Must reload font [`Oxid8::load_font`].
+    /// Must reload rom [`Oxid8::load_rom_bytes`].
     pub fn reset(&mut self) {
-        *self = Oxid8::default();
+        *self = Self::new(self.seed);
     }
 
     /// Emulates a full frame.
@@ -485,6 +490,7 @@ impl Oxid8 {
 }
 
 impl Default for Oxid8 {
+    /// Creates a new [`Oxid8`] instance with a default seed of 0.
     fn default() -> Self {
         Self::new(0)
     }
