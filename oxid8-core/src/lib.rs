@@ -93,7 +93,7 @@ use std::time::Duration;
 use rand_core::{Rng, SeedableRng};
 use rand_pcg::Pcg64Mcg;
 
-mod screen;
+pub mod screen;
 
 /// Standard CPU tick rate set to 700Hz. This value is not used internally.
 /// Run a CPU cycle this often.

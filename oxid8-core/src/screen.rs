@@ -2,6 +2,20 @@
 
 use bitvec::prelude::*;
 
+#[cfg(feature = "std")]
+use std::vec::Vec;
+#[cfg(feature = "std")]
+type BoolVec = Vec<bool>;
+#[cfg(feature = "std")]
+type U8Vec = Vec<u8>;
+
+#[cfg(not(feature = "std"))]
+use heapless::Vec;
+#[cfg(not(feature = "std"))]
+type BoolVec = Vec<u8, SCREEN_AREA>;
+#[cfg(not(feature = "std"))]
+type U8Vec = Vec<u8, SCREEN_AREA>;
+
 /// Virtual screen width (64 pixels).
 pub const SCREEN_WIDTH: usize = 64;
 
@@ -11,7 +25,7 @@ pub const SCREEN_HEIGHT: usize = 32;
 /// Virtual screen area (2048 pixels).
 pub const SCREEN_AREA: usize = SCREEN_WIDTH * SCREEN_HEIGHT;
 
-pub type BitDisplay = BitArr!(for (SCREEN_AREA / 8), in u8);
+pub type BitDisplay = BitArr!(for SCREEN_AREA, in u8);
 
 /// Tightly packed screen
 #[allow(dead_code)]
@@ -65,50 +79,14 @@ pub trait FrameBuffer {
     fn unpack(&mut self, packed: &BitDisplay);
 }
 
-/// Unpack the display into a slice of singular bool values.
-/// Useful for black/white displays.
-impl FrameBuffer for &mut [bool; SCREEN_AREA] {
-    fn unpack(&mut self, packed: &BitDisplay) {
-        for (i, px) in packed.iter().by_vals().enumerate() {
-            self[i] = px;
-        }
-    }
-}
-
-/// Unpack the display into a slice of singular u8 values.
-/// Useful for black/white displays.
-impl FrameBuffer for &mut [u8; SCREEN_AREA] {
-    fn unpack(&mut self, packed: &BitDisplay) {
-        for (i, px) in packed.iter().by_vals().enumerate() {
-            self[i] = if px { 255 } else { 0 };
-        }
-    }
-}
-
-/// Unpack the display into a quadruples of singular u8 values.
-/// Useful for color displays.
-///
-/// # Example
-/// ```no_run
-/// let frame = display.unpack_as<[[u8; 4]; SCREEN_AREA]>().iter().flatten().collect();
-/// ```
-#[cfg(feature = "std")]
-impl FrameBuffer for [[u8; 4]; SCREEN_AREA] {
-    fn unpack(&mut self, packed: &BitDisplay) {
-        for (i, px) in packed.iter().by_vals().enumerate() {
-            self[i] = if px {
-                [255, 255, 255, 255]
-            } else {
-                [0, 0, 0, 255]
-            };
-        }
-    }
-}
-
 /// Unpack the display into a vector of singular bool values.
 /// Useful for black/white displays.
-#[cfg(feature = "std")]
-impl FrameBuffer for Vec<bool> {
+///
+/// # Example
+/// ```ignore
+/// let fb: BoolVec = display.unpack_as();
+/// ```
+impl FrameBuffer for BoolVec {
     fn unpack(&mut self, packed: &BitDisplay) {
         self.clear();
         self.reserve(SCREEN_AREA);
@@ -121,8 +99,12 @@ impl FrameBuffer for Vec<bool> {
 
 /// Unpack the display into a vector of singular u8 values.
 /// Useful for black/white displays.
-#[cfg(feature = "std")]
-impl FrameBuffer for Vec<u8> {
+///
+/// # Example
+/// ```ignore
+/// let fb: U8Vec = display.unpack_as();
+/// ```
+impl FrameBuffer for U8Vec {
     fn unpack(&mut self, packed: &BitDisplay) {
         self.clear();
         self.reserve(SCREEN_AREA);
@@ -133,25 +115,54 @@ impl FrameBuffer for Vec<u8> {
     }
 }
 
-/// Unpack the display into a quadruples of singular u8 values.
+#[derive(Default)]
+#[cfg(feature = "std")]
+pub struct FlatRgba(Vec<u8>);
+
+/// Unpack the display into a quadruples of u8 values.
 /// Useful for color displays.
 ///
 /// # Example
-/// ```no_run
-/// let frame = display.unpack_as<Vec<[u8; 4]>>().iter().flatten().collect();
+/// ```ignore
+/// let fb: FlatRgba = display.unpack_as();
 /// ```
 #[cfg(feature = "std")]
-impl FrameBuffer for Vec<[u8; 4]> {
+impl FrameBuffer for FlatRgba {
     fn unpack(&mut self, packed: &BitDisplay) {
-        self.clear();
-        self.reserve(SCREEN_AREA);
+        self.0.clear();
+        self.0.reserve(SCREEN_AREA);
 
         packed.iter().by_vals().for_each(|px| {
-            self.push(if px {
-                [255, 255, 255, 255]
+            self.0.extend_from_slice(if px {
+                &[255, 255, 255, 255]
             } else {
-                [0, 0, 0, 255]
+                &[0, 0, 0, 255]
             });
         });
+    }
+}
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_as() {
+        let display = Display::new();
+
+        let a: BoolVec = display.unpack_as();
+        let b: U8Vec = display.unpack_as();
+        let c: FlatRgba = display.unpack_as();
+
+        assert_eq!(a, vec![false; SCREEN_AREA]);
+        assert_eq!(b, vec![0u8; SCREEN_AREA]);
+        assert_eq!(
+            c.0,
+            vec![[0, 0, 0, 255]; SCREEN_AREA]
+                .iter()
+                .flatten()
+                .copied()
+                .collect::<Vec<u8>>()
+        );
     }
 }
