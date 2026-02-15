@@ -646,10 +646,24 @@ impl Oxid8 {
     /// set VF = collision.
     fn drw(&mut self, x: usize, y: usize, n: u8) {
         // a sprite is a byte wide and n in [1,15] rows where n is an integer
-        let (x, y) = (
+        let (x_start, y_start) = (
             self.v_reg[x] as usize % SCREEN_WIDTH,  // wrap
             self.v_reg[y] as usize % SCREEN_HEIGHT, // wrap
         );
+
+        let start_addr = self.i_reg as usize;
+        let n_bytes = n as usize;
+
+        let sprite_record = display::SpriteRecord {
+            x_start,
+            y_start,
+            data: &self.ram[start_addr..start_addr + n_bytes],
+        };
+
+        let mut dsp = display::Display::new();
+        self.v_reg[VF] = dsp.drw(sprite_record) as u8;
+
+        /*
         self.v_reg[VF] = 0; // turn off collision flag
         let start_pixel: usize = (y * SCREEN_WIDTH) + x;
         let start_addr: usize = self.i_reg as usize;
@@ -678,6 +692,7 @@ impl Oxid8 {
                 }
             }
         }
+        */
     }
 
     /// Ex9E - Skip next instruction if key with the value of Vx is pressed.

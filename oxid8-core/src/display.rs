@@ -44,11 +44,11 @@ pub const DISPLAY_AREA: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 /// Type alias for a bit array.
 pub type BitDisplay = BitArr!(for DISPLAY_AREA, in u8);
 
-pub struct Sprite<'a> {
-    x_start: usize,
-    y_start: usize,
-    n_bytes: usize,
-    data: &'a [u8],
+/// Sprite data record.
+pub(crate) struct SpriteRecord<'a> {
+    pub(crate) x_start: usize,
+    pub(crate) y_start: usize,
+    pub(crate) data: &'a [u8],
 }
 
 #[allow(dead_code)]
@@ -77,26 +77,26 @@ impl Display {
     }
 
     /// Draw a sprite to the display.
-    pub(crate) fn drw(&mut self, s: &Sprite) -> bool {
+    pub(crate) fn drw(&mut self, s: SpriteRecord) -> bool {
         let start_posn: usize = (s.y_start * DISPLAY_WIDTH) + s.x_start;
         let mut collision = false;
 
-        for i in 0..s.n_bytes {
+        for (i, byte) in s.data.iter().enumerate() {
             if s.y_start + i >= DISPLAY_HEIGHT {
                 break; // clip
             }
+
             let byte_posn: usize = start_posn + (DISPLAY_WIDTH * i);
-            let sprite_row: u8 = s.data[i];
 
             for j in 0..8 {
                 if s.x_start + j >= DISPLAY_WIDTH {
                     break; // clip
                 }
+
                 let mut px = self.0.get_mut(byte_posn + j).unwrap();
                 let old_px = *px;
 
-                let px_data = (sprite_row >> (0x7 - j)) & 0x1;
-                *px ^= px_data != 0;
+                *px ^= (byte & (0x80 >> j)) != 0;
 
                 if !(*px) && old_px {
                     collision = true;
