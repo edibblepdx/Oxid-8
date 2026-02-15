@@ -12,23 +12,23 @@ type U8Vec = Vec<u8>;
 #[cfg(not(feature = "std"))]
 use heapless::Vec;
 #[cfg(not(feature = "std"))]
-type BoolVec = Vec<u8, SCREEN_AREA>;
+type BoolVec = Vec<u8, DISPLAY_AREA>;
 #[cfg(not(feature = "std"))]
-type U8Vec = Vec<u8, SCREEN_AREA>;
+type U8Vec = Vec<u8, DISPLAY_AREA>;
 
-/// Virtual screen width (64 pixels).
-pub const SCREEN_WIDTH: usize = 64;
+/// Virtual display width (64 pixels).
+pub const DISPLAY_WIDTH: usize = 64;
 
-/// Virtual screen height (32 pixels).
-pub const SCREEN_HEIGHT: usize = 32;
+/// Virtual display height (32 pixels).
+pub const DISPLAY_HEIGHT: usize = 32;
 
-/// Virtual screen area (2048 pixels).
-pub const SCREEN_AREA: usize = SCREEN_WIDTH * SCREEN_HEIGHT;
+/// Virtual display area (2048 pixels).
+pub const DISPLAY_AREA: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 
 /// Bit display.
-pub type BitDisplay = BitArr!(for SCREEN_AREA, in u8);
+pub type BitDisplay = BitArr!(for DISPLAY_AREA, in u8);
 
-/// Tightly packed screen
+/// Tightly packed display
 #[allow(dead_code)]
 pub struct Display(BitDisplay);
 
@@ -48,7 +48,7 @@ impl Display {
         Self(BitArray::ZERO)
     }
 
-    /// Clear the screen.
+    /// Clear the display.
     pub(crate) fn cls(&mut self) {
         self.0 = BitArray::ZERO;
     }
@@ -56,12 +56,12 @@ impl Display {
     /// Draw
     //pub(crate) fn drw(&mut self, x: usize, y: usize, n: u8) {}
 
-    /// Unpacks the screen into out
+    /// Unpacks the display into out
     pub fn unpack_into<T: FrameBuffer>(&self, out: &mut T) {
         out.unpack(&self.0);
     }
 
-    /// Unpacks the screen as a copy
+    /// Unpacks the display as a copy
     pub fn unpack_as<T: FromDisplay>(&self) -> T {
         T::from_display(&self.0)
     }
@@ -101,7 +101,7 @@ impl FrameBuffer for BoolVec {
         #[cfg(feature = "std")]
         {
             self.clear();
-            self.reserve(SCREEN_AREA);
+            self.reserve(DISPLAY_AREA);
         }
 
         for px in packed.iter().by_vals() {
@@ -123,7 +123,7 @@ impl FrameBuffer for U8Vec {
         #[cfg(feature = "std")]
         {
             self.clear();
-            self.reserve(SCREEN_AREA);
+            self.reserve(DISPLAY_AREA);
         }
 
         for px in packed.iter().by_vals() {
@@ -139,7 +139,7 @@ pub struct FlatRgba(Vec<u8>);
 
 #[cfg(not(feature = "std"))]
 #[derive(Default)]
-pub struct FlatRgba(Vec<u8, { SCREEN_AREA * 4 }>);
+pub struct FlatRgba(Vec<u8, { DISPLAY_AREA * 4 }>);
 
 /// Unpack the display into quadruples of u8 values.
 /// Useful for color displays.
@@ -154,7 +154,7 @@ impl FrameBuffer for FlatRgba {
         #[cfg(feature = "std")]
         {
             self.0.clear();
-            self.0.reserve(SCREEN_AREA * 4);
+            self.0.reserve(DISPLAY_AREA * 4);
         }
 
         for px in packed.iter().by_vals() {
@@ -180,11 +180,11 @@ mod tests {
         let b: U8Vec = display.unpack_as();
         let c: FlatRgba = display.unpack_as();
 
-        assert_eq!(a, vec![false; SCREEN_AREA]);
-        assert_eq!(b, vec![0u8; SCREEN_AREA]);
+        assert_eq!(a, vec![false; DISPLAY_AREA]);
+        assert_eq!(b, vec![0u8; DISPLAY_AREA]);
         assert_eq!(
             c.0,
-            vec![[0, 0, 0, 255]; SCREEN_AREA]
+            vec![[0, 0, 0, 255]; DISPLAY_AREA]
                 .iter()
                 .flatten()
                 .copied()
