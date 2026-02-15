@@ -21,7 +21,7 @@ cfg_if::cfg_if! {
         use heapless::Vec;
 
         /// Type alias for no_std compatibility.
-        pub type BoolVec = Vec<u8, DISPLAY_AREA>;
+        pub type BoolVec = Vec<bool, DISPLAY_AREA>;
         /// Type alias for no_std compatibility.
         pub type U8Vec = Vec<u8, DISPLAY_AREA>;
 
@@ -114,11 +114,10 @@ pub trait FrameBuffer {
 /// ```
 impl FrameBuffer for BoolVec {
     fn unpack(&mut self, packed: &BitDisplay) {
+        self.clear();
+
         #[cfg(feature = "std")]
-        {
-            self.clear();
-            self.reserve(DISPLAY_AREA);
-        }
+        self.reserve(DISPLAY_AREA);
 
         for px in packed.iter().by_vals() {
             // Safe to ignore result: capacity guaranteed.
@@ -137,11 +136,10 @@ impl FrameBuffer for BoolVec {
 /// ```
 impl FrameBuffer for U8Vec {
     fn unpack(&mut self, packed: &BitDisplay) {
+        self.clear();
+
         #[cfg(feature = "std")]
-        {
-            self.clear();
-            self.reserve(DISPLAY_AREA);
-        }
+        self.reserve(DISPLAY_AREA);
 
         for px in packed.iter().by_vals() {
             // Safe to ignore result: capacity guaranteed.
@@ -158,14 +156,12 @@ impl FrameBuffer for U8Vec {
 /// ```ignore
 /// let fb: FlatRgba = display.unpack_as();
 /// ```
-#[cfg(feature = "std")]
 impl FrameBuffer for FlatRgba {
     fn unpack(&mut self, packed: &BitDisplay) {
+        self.0.clear();
+
         #[cfg(feature = "std")]
-        {
-            self.0.clear();
-            self.0.reserve(DISPLAY_AREA * 4);
-        }
+        self.0.reserve(DISPLAY_AREA);
 
         for px in packed.iter().by_vals() {
             // Safe to ignore result: capacity guaranteed.
@@ -179,11 +175,12 @@ impl FrameBuffer for FlatRgba {
     }
 }
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "std")]
     fn display_as() {
         let display = Display::new();
 
@@ -201,5 +198,25 @@ mod tests {
                 .copied()
                 .collect::<Vec<u8>>()
         );
+    }
+
+    #[test]
+    #[cfg(not(feature = "std"))]
+    fn display_as() {
+        let display = Display::new();
+
+        let a: BoolVec = display.unpack_as();
+        let b: U8Vec = display.unpack_as();
+        let c: FlatRgba = display.unpack_as();
+
+        assert_eq!(a, BoolVec::from_array([false; DISPLAY_AREA]));
+        assert_eq!(b, U8Vec::from_array([0u8; DISPLAY_AREA]));
+
+        let mut expected = FlatRgba(heapless::Vec::new());
+        for _ in 0..DISPLAY_AREA {
+            expected.0.extend_from_slice(&[0, 0, 0, 255]).unwrap();
+        }
+
+        assert_eq!(c.0, expected.0);
     }
 }
