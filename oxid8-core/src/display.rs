@@ -1,4 +1,4 @@
-//! Bit display.
+//! `#![no_std]` compatible bit display.
 
 use bitvec::prelude::*;
 
@@ -44,6 +44,13 @@ pub const DISPLAY_AREA: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 /// Type alias for a bit array.
 pub type BitDisplay = BitArr!(for DISPLAY_AREA, in u8);
 
+pub struct Sprite<'a> {
+    x_start: usize,
+    y_start: usize,
+    n_bytes: usize,
+    data: &'a [u8],
+}
+
 #[allow(dead_code)]
 /// Tightly packed display.
 pub struct Display(BitDisplay);
@@ -69,8 +76,36 @@ impl Display {
         self.0 = BitArray::ZERO;
     }
 
-    /// TODO: Draw
-    pub(crate) fn drw(&mut self, x: usize, y: usize, n: u8) {}
+    /// Draw a sprite to the display.
+    pub(crate) fn drw(&mut self, s: &Sprite) -> bool {
+        let start_posn: usize = (s.y_start * DISPLAY_WIDTH) + s.x_start;
+        let mut collision = false;
+
+        for i in 0..s.n_bytes {
+            if s.y_start + i >= DISPLAY_HEIGHT {
+                break; // clip
+            }
+            let byte_posn: usize = start_posn + (DISPLAY_WIDTH * i);
+            let sprite_row: u8 = s.data[i];
+
+            for j in 0..8 {
+                if s.x_start + j >= DISPLAY_WIDTH {
+                    break; // clip
+                }
+                let mut px = self.0.get_mut(byte_posn + j).unwrap();
+                let old_px = *px;
+
+                let px_data = (sprite_row >> (0x7 - j)) & 0x1;
+                *px ^= px_data != 0;
+
+                if !(*px) && old_px {
+                    collision = true;
+                }
+            }
+        }
+
+        collision
+    }
 
     /// Unpacks the display into out.
     pub fn unpack_into<T: FrameBuffer>(&self, out: &mut T) {
@@ -88,7 +123,7 @@ pub trait FromDisplay {
     fn from_display(display: &BitDisplay) -> Self;
 }
 
-/// Auto trait impl for types that implement [`FrameBuffer`].
+/// Auto trait impl for types that implement [`FrameBuffer`] and [`Default`].
 impl<T> FromDisplay for T
 where
     T: FrameBuffer + Default,

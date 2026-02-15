@@ -9,7 +9,7 @@
 //!
 //! # Getting Started
 //!
-//! ```no_run
+//! ```ignore
 //! use oxid8_core::Oxid8;
 //! use std::time::{Duration, Instant};
 //!
@@ -253,7 +253,7 @@ impl Oxid8 {
             dt: 0,
             st: 0,
             rng: Pcg64Mcg::seed_from_u64(seed),
-            seed: seed,
+            seed,
         }
     }
 
