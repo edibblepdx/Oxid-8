@@ -25,11 +25,21 @@ pub const SCREEN_HEIGHT: usize = 32;
 /// Virtual screen area (2048 pixels).
 pub const SCREEN_AREA: usize = SCREEN_WIDTH * SCREEN_HEIGHT;
 
+/// Bit display.
 pub type BitDisplay = BitArr!(for SCREEN_AREA, in u8);
 
 /// Tightly packed screen
 #[allow(dead_code)]
 pub struct Display(BitDisplay);
+
+/// Provide an immutable reference to the inner [`BitDisplay`].
+impl core::ops::Deref for Display {
+    type Target = BitDisplay;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[allow(dead_code)]
 impl Display {
