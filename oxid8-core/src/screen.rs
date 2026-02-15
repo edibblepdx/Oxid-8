@@ -94,10 +94,10 @@ impl FrameBuffer for BoolVec {
             self.reserve(SCREEN_AREA);
         }
 
-        packed.iter().by_vals().for_each(|px| {
+        for px in packed.iter().by_vals() {
             // Safe to ignore result: capacity guaranteed.
             let _ = self.push(px);
-        });
+        }
     }
 }
 
@@ -116,10 +116,10 @@ impl FrameBuffer for U8Vec {
             self.reserve(SCREEN_AREA);
         }
 
-        packed.iter().by_vals().for_each(|px| {
+        for px in packed.iter().by_vals() {
             // Safe to ignore result: capacity guaranteed.
             let _ = self.push(if px { 255 } else { 0 });
-        });
+        }
     }
 }
 
@@ -147,14 +147,14 @@ impl FrameBuffer for FlatRgba {
             self.0.reserve(SCREEN_AREA * 4);
         }
 
-        packed.iter().by_vals().for_each(|px| {
+        for px in packed.iter().by_vals() {
             // Safe to ignore result: capacity guaranteed.
             let _ = self.0.extend_from_slice(if px {
                 &[255, 255, 255, 255]
             } else {
                 &[0, 0, 0, 255]
             });
-        });
+        }
     }
 }
 
