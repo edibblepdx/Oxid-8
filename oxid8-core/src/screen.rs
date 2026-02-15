@@ -88,11 +88,15 @@ pub trait FrameBuffer {
 /// ```
 impl FrameBuffer for BoolVec {
     fn unpack(&mut self, packed: &BitDisplay) {
-        self.clear();
-        self.reserve(SCREEN_AREA);
+        #[cfg(feature = "std")]
+        {
+            self.clear();
+            self.reserve(SCREEN_AREA);
+        }
 
         packed.iter().by_vals().for_each(|px| {
-            self.push(px);
+            // Safe to ignore result: capacity guaranteed.
+            let _ = self.push(px);
         });
     }
 }
@@ -106,20 +110,28 @@ impl FrameBuffer for BoolVec {
 /// ```
 impl FrameBuffer for U8Vec {
     fn unpack(&mut self, packed: &BitDisplay) {
-        self.clear();
-        self.reserve(SCREEN_AREA);
+        #[cfg(feature = "std")]
+        {
+            self.clear();
+            self.reserve(SCREEN_AREA);
+        }
 
         packed.iter().by_vals().for_each(|px| {
-            self.push(if px { 255 } else { 0 });
+            // Safe to ignore result: capacity guaranteed.
+            let _ = self.push(if px { 255 } else { 0 });
         });
     }
 }
 
-#[derive(Default)]
 #[cfg(feature = "std")]
+#[derive(Default)]
 pub struct FlatRgba(Vec<u8>);
 
-/// Unpack the display into a quadruples of u8 values.
+#[cfg(not(feature = "std"))]
+#[derive(Default)]
+pub struct FlatRgba(Vec<u8, { SCREEN_AREA * 4 }>);
+
+/// Unpack the display into quadruples of u8 values.
 /// Useful for color displays.
 ///
 /// # Example
@@ -129,11 +141,15 @@ pub struct FlatRgba(Vec<u8>);
 #[cfg(feature = "std")]
 impl FrameBuffer for FlatRgba {
     fn unpack(&mut self, packed: &BitDisplay) {
-        self.0.clear();
-        self.0.reserve(SCREEN_AREA);
+        #[cfg(feature = "std")]
+        {
+            self.0.clear();
+            self.0.reserve(SCREEN_AREA * 4);
+        }
 
         packed.iter().by_vals().for_each(|px| {
-            self.0.extend_from_slice(if px {
+            // Safe to ignore result: capacity guaranteed.
+            let _ = self.0.extend_from_slice(if px {
                 &[255, 255, 255, 255]
             } else {
                 &[0, 0, 0, 255]
