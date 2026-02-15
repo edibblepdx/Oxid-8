@@ -1,65 +1,157 @@
+//! Bit display.
+
+use bitvec::prelude::*;
+
+/// Virtual screen width (64 pixels).
+pub const SCREEN_WIDTH: usize = 64;
+
+/// Virtual screen height (32 pixels).
+pub const SCREEN_HEIGHT: usize = 32;
+
+/// Virtual screen area (2048 pixels).
+pub const SCREEN_AREA: usize = SCREEN_WIDTH * SCREEN_HEIGHT;
+
+pub type BitDisplay = BitArr!(for (SCREEN_AREA / 8), in u8);
+
 /// Tightly packed screen
 #[allow(dead_code)]
-pub struct Screen {
-    pixels: [u8; 256],
-    pub draw: bool,
-}
+pub struct Display(BitDisplay);
 
 #[allow(dead_code)]
-impl Screen {
-    pub fn new() -> Self {
-        Self {
-            pixels: [0; 256],
-            draw: false,
-        }
+impl Display {
+    /// Create a new display.
+    pub(crate) fn new() -> Self {
+        Self(BitArray::ZERO)
     }
 
-    pub fn clear(&mut self) {
-        self.pixels = [0; 256];
-        self.draw = true;
+    /// Clear the screen.
+    pub(crate) fn cls(&mut self) {
+        self.0 = BitArray::ZERO;
     }
 
-    pub fn draw(&mut self, x: usize, y: usize, n: u8) {}
+    /// Draw
+    //pub(crate) fn drw(&mut self, x: usize, y: usize, n: u8) {}
 
     /// Unpacks the screen into out
-    pub fn unpack_into<T>(&self, out: &mut T)
-    where
-        T: BitUnpacker,
-    {
-        out.unpack(&self.pixels);
+    pub fn unpack_into<T: FrameBuffer>(&self, out: &mut T) {
+        out.unpack(&self.0);
+    }
+
+    /// Unpacks the screen as a copy
+    pub fn unpack_as<T: FromDisplay>(&self) -> T {
+        T::from_display(&self.0)
     }
 }
 
-fn bits(byte: u8) -> impl Iterator<Item = u8> {
-    (0..8).rev().map(move |i| (byte >> i) & 1)
+/// Trait for unpacking a BitDisplay into a new buffer.
+pub trait FromDisplay {
+    fn from_display(display: &BitDisplay) -> Self;
 }
 
-pub trait BitUnpacker {
-    fn unpack(&mut self, packed: &[u8; 256]);
+/// Auto trait impl for types that implement [`FrameBuffer`].
+impl<T> FromDisplay for T
+where
+    T: FrameBuffer + Default,
+{
+    fn from_display(display: &BitDisplay) -> Self {
+        let mut out = Self::default();
+        out.unpack(display);
+        out
+    }
 }
 
-impl BitUnpacker for Vec<u8> {
-    fn unpack(&mut self, packed: &[u8; 256]) {
-        self.clear();
-        self.reserve(2048);
+/// Trait for unpacking a BitDisplay into a pre-allocated buffer.
+pub trait FrameBuffer {
+    fn unpack(&mut self, packed: &BitDisplay);
+}
 
-        for &byte in packed {
-            for bit in bits(byte) {
-                self.push(bit * 255)
-            }
+/// Unpack the display into a slice of singular bool values.
+/// Useful for black/white displays.
+impl FrameBuffer for &mut [bool; SCREEN_AREA] {
+    fn unpack(&mut self, packed: &BitDisplay) {
+        for (i, px) in packed.iter().by_vals().enumerate() {
+            self[i] = px;
         }
     }
 }
 
-impl BitUnpacker for Vec<bool> {
-    fn unpack(&mut self, packed: &[u8; 256]) {
-        self.clear();
-        self.reserve(2048);
-
-        for &byte in packed {
-            for bit in bits(byte) {
-                self.push(if bit != 0 { true } else { false })
-            }
+/// Unpack the display into a slice of singular u8 values.
+/// Useful for black/white displays.
+impl FrameBuffer for &mut [u8; SCREEN_AREA] {
+    fn unpack(&mut self, packed: &BitDisplay) {
+        for (i, px) in packed.iter().by_vals().enumerate() {
+            self[i] = if px { 255 } else { 0 };
         }
+    }
+}
+
+/// Unpack the display into a quadruples of singular u8 values.
+/// Useful for color displays.
+///
+/// # Example
+/// ```no_run
+/// let frame = display.unpack_as<[[u8; 4]; SCREEN_AREA]>().iter().flatten().collect();
+/// ```
+#[cfg(feature = "std")]
+impl FrameBuffer for [[u8; 4]; SCREEN_AREA] {
+    fn unpack(&mut self, packed: &BitDisplay) {
+        for (i, px) in packed.iter().by_vals().enumerate() {
+            self[i] = if px {
+                [255, 255, 255, 255]
+            } else {
+                [0, 0, 0, 255]
+            };
+        }
+    }
+}
+
+/// Unpack the display into a vector of singular bool values.
+/// Useful for black/white displays.
+#[cfg(feature = "std")]
+impl FrameBuffer for Vec<bool> {
+    fn unpack(&mut self, packed: &BitDisplay) {
+        self.clear();
+        self.reserve(SCREEN_AREA);
+
+        packed.iter().by_vals().for_each(|px| {
+            self.push(px);
+        });
+    }
+}
+
+/// Unpack the display into a vector of singular u8 values.
+/// Useful for black/white displays.
+#[cfg(feature = "std")]
+impl FrameBuffer for Vec<u8> {
+    fn unpack(&mut self, packed: &BitDisplay) {
+        self.clear();
+        self.reserve(SCREEN_AREA);
+
+        packed.iter().by_vals().for_each(|px| {
+            self.push(if px { 255 } else { 0 });
+        });
+    }
+}
+
+/// Unpack the display into a quadruples of singular u8 values.
+/// Useful for color displays.
+///
+/// # Example
+/// ```no_run
+/// let frame = display.unpack_as<Vec<[u8; 4]>>().iter().flatten().collect();
+/// ```
+#[cfg(feature = "std")]
+impl FrameBuffer for Vec<[u8; 4]> {
+    fn unpack(&mut self, packed: &BitDisplay) {
+        self.clear();
+        self.reserve(SCREEN_AREA);
+
+        packed.iter().by_vals().for_each(|px| {
+            self.push(if px {
+                [255, 255, 255, 255]
+            } else {
+                [0, 0, 0, 255]
+            });
+        });
     }
 }
