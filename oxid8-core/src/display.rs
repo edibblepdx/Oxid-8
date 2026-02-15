@@ -2,19 +2,35 @@
 
 use bitvec::prelude::*;
 
-#[cfg(feature = "std")]
-use std::vec::Vec;
-#[cfg(feature = "std")]
-type BoolVec = Vec<bool>;
-#[cfg(feature = "std")]
-type U8Vec = Vec<u8>;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "std")] {
 
-#[cfg(not(feature = "std"))]
-use heapless::Vec;
-#[cfg(not(feature = "std"))]
-type BoolVec = Vec<u8, DISPLAY_AREA>;
-#[cfg(not(feature = "std"))]
-type U8Vec = Vec<u8, DISPLAY_AREA>;
+        use std::vec::Vec;
+
+        /// Type alias for no_std compatibility.
+        pub type BoolVec = Vec<bool>;
+        /// Type alias for no_std compatibility.
+        pub type U8Vec = Vec<u8>;
+
+        /// Newtype over a [`std::vec::Vec`] for quadruples of [`u8`].
+        #[derive(Default)]
+        pub struct FlatRgba(Vec<u8>);
+
+    } else {
+
+        use heapless::Vec;
+
+        /// Type alias for no_std compatibility.
+        pub type BoolVec = Vec<u8, DISPLAY_AREA>;
+        /// Type alias for no_std compatibility.
+        pub type U8Vec = Vec<u8, DISPLAY_AREA>;
+
+        /// Newtype over a [`heapless::Vec`] for quadruples of [`u8`].
+        #[derive(Default)]
+        pub struct FlatRgba(Vec<u8, { DISPLAY_AREA * 4 }>);
+
+    }
+}
 
 /// Virtual display width (64 pixels).
 pub const DISPLAY_WIDTH: usize = 64;
@@ -25,11 +41,11 @@ pub const DISPLAY_HEIGHT: usize = 32;
 /// Virtual display area (2048 pixels).
 pub const DISPLAY_AREA: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 
-/// Bit display.
+/// Type alias for a bit array.
 pub type BitDisplay = BitArr!(for DISPLAY_AREA, in u8);
 
-/// Tightly packed display
 #[allow(dead_code)]
+/// Tightly packed display.
 pub struct Display(BitDisplay);
 
 /// Provide an immutable reference to the inner [`BitDisplay`].
@@ -53,15 +69,15 @@ impl Display {
         self.0 = BitArray::ZERO;
     }
 
-    /// Draw
-    //pub(crate) fn drw(&mut self, x: usize, y: usize, n: u8) {}
+    /// TODO: Draw
+    pub(crate) fn drw(&mut self, x: usize, y: usize, n: u8) {}
 
-    /// Unpacks the display into out
+    /// Unpacks the display into out.
     pub fn unpack_into<T: FrameBuffer>(&self, out: &mut T) {
         out.unpack(&self.0);
     }
 
-    /// Unpacks the display as a copy
+    /// Unpacks the display as a copy.
     pub fn unpack_as<T: FromDisplay>(&self) -> T {
         T::from_display(&self.0)
     }
@@ -89,7 +105,7 @@ pub trait FrameBuffer {
     fn unpack(&mut self, packed: &BitDisplay);
 }
 
-/// Unpack the display into a vector of singular bool values.
+/// Unpack the display into a vector of singular [`bool`] values.
 /// Useful for black/white displays.
 ///
 /// # Example
@@ -106,12 +122,13 @@ impl FrameBuffer for BoolVec {
 
         for px in packed.iter().by_vals() {
             // Safe to ignore result: capacity guaranteed.
+            #[allow(clippy::let_unit_value)]
             let _ = self.push(px);
         }
     }
 }
 
-/// Unpack the display into a vector of singular u8 values.
+/// Unpack the display into a vector of singular [`u8`] values.
 /// Useful for black/white displays.
 ///
 /// # Example
@@ -128,18 +145,11 @@ impl FrameBuffer for U8Vec {
 
         for px in packed.iter().by_vals() {
             // Safe to ignore result: capacity guaranteed.
+            #[allow(clippy::let_unit_value)]
             let _ = self.push(if px { 255 } else { 0 });
         }
     }
 }
-
-#[cfg(feature = "std")]
-#[derive(Default)]
-pub struct FlatRgba(Vec<u8>);
-
-#[cfg(not(feature = "std"))]
-#[derive(Default)]
-pub struct FlatRgba(Vec<u8, { DISPLAY_AREA * 4 }>);
 
 /// Unpack the display into quadruples of u8 values.
 /// Useful for color displays.
@@ -159,6 +169,7 @@ impl FrameBuffer for FlatRgba {
 
         for px in packed.iter().by_vals() {
             // Safe to ignore result: capacity guaranteed.
+            #[allow(clippy::let_unit_value)]
             let _ = self.0.extend_from_slice(if px {
                 &[255, 255, 255, 255]
             } else {

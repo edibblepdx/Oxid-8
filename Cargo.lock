@@ -1552,6 +1552,7 @@ name = "oxid8-core"
 version = "0.2.0"
 dependencies = [
  "bitvec",
+ "cfg-if",
  "heapless",
  "rand_core",
  "rand_pcg",
