@@ -7,7 +7,10 @@ use crossterm::{
     queue,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
-use oxid8_core::{CPU_TICK, Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH, TIMER_TICK};
+use oxid8_core::{
+    CPU_TICK, Oxid8, TIMER_TICK,
+    display::{BoolVec, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Flex, Layout, Rect},
@@ -149,7 +152,7 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn run(config: Config) -> io::Result<()> {
+fn run(config: Config) -> anyhow::Result<()> {
     // Install Signal Hooks
     let (tx, rx) = mpsc::channel();
     let mut signals = Signals::new([SIGCONT])?;
@@ -194,7 +197,7 @@ fn run(config: Config) -> io::Result<()> {
             }
 
             if let Err(err) = emu.core.run_cycle() {
-                eprintln!("{err}");
+                eprintln!("{err:?}");
             }
 
             // To support more terminals
@@ -215,8 +218,8 @@ fn run(config: Config) -> io::Result<()> {
                 emu.state.area = frame.area();
 
                 // Rendering half-blocks
-                let width = SCREEN_WIDTH;
-                let height = SCREEN_HEIGHT / 2;
+                let width = DISPLAY_WIDTH;
+                let height = DISPLAY_HEIGHT / 2;
 
                 // Drawing area
                 let area = center(
@@ -243,7 +246,8 @@ fn run(config: Config) -> io::Result<()> {
         }
     }
 
-    Terminal::exit()
+    Terminal::exit()?;
+    Ok(())
 }
 
 fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
@@ -310,10 +314,10 @@ fn handle_key_event(key_event: KeyEvent, state: &mut EmuState) -> Option<u8> {
 
 impl Shape for Emu {
     fn draw(&self, painter: &mut Painter) {
-        let screen_ref = self.core.screen_ref();
-        for y in 0..SCREEN_HEIGHT {
-            for x in 0..SCREEN_WIDTH {
-                if screen_ref[x + y * SCREEN_WIDTH]
+        let display: BoolVec = self.core.display_ref().unpack_as();
+        for y in 0..DISPLAY_HEIGHT {
+            for x in 0..DISPLAY_WIDTH {
+                if display[x + y * DISPLAY_WIDTH]
                     && x < self.state.area.width as usize
                     && y < (self.state.area.height * 2) as usize
                 // WARN: ONLY for rendering half-blocks
@@ -329,10 +333,10 @@ impl Shape for Emu {
      *********************************************************************
     fn draw(&self, painter: &mut Painter) {
         let screen_ref = self.core.screen_ref();
-        for y in 0..SCREEN_HEIGHT {
-            for x in 0..SCREEN_WIDTH {
-                if screen_ref[x + y * SCREEN_WIDTH] {
-                    let y = SCREEN_HEIGHT - 1 - y;
+        for y in 0..DISPLAY_HEIGHT {
+            for x in 0..DISPLAY_WIDTH {
+                if screen_ref[x + y * DISPLAY_WIDTH] {
+                    let y = DISPLAY_HEIGHT - 1 - y;
                     if let Some((x, y)) = painter.get_point(x as f64, y as f64) {
                         painter.paint(x, y, Color::White);
                     }

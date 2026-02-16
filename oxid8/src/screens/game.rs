@@ -1,5 +1,8 @@
 use crate::app::AppState;
-use oxid8_core::{Oxid8, SCREEN_HEIGHT, SCREEN_WIDTH};
+use oxid8_core::{
+    Oxid8,
+    display::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
+};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -51,8 +54,8 @@ impl Game {
 
 impl Widget for &mut Game {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let width = SCREEN_WIDTH as f64;
-        let height = SCREEN_HEIGHT as f64;
+        let width = DISPLAY_WIDTH as f64;
+        let height = DISPLAY_HEIGHT as f64;
 
         Widget::render(
             Canvas::default()
@@ -60,10 +63,10 @@ impl Widget for &mut Game {
                 .y_bounds([-height / 2.0, height / 2.0])
                 .marker(Marker::HalfBlock)
                 .paint(|ctx| {
-                    let screen_ref = self.emu.screen_ref();
-                    for y in 0..SCREEN_HEIGHT {
-                        for x in 0..SCREEN_WIDTH {
-                            if screen_ref[x + y * SCREEN_WIDTH] {
+                    let screen_ref: Vec<bool> = self.emu.display_ref().unpack_as();
+                    for y in 0..DISPLAY_HEIGHT {
+                        for x in 0..DISPLAY_WIDTH {
+                            if screen_ref[x + y * DISPLAY_WIDTH] {
                                 ctx.print(x as f64, y as f64, "█");
                             }
                         }

@@ -52,6 +52,7 @@ pub(crate) struct SpriteRecord<'a> {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 /// Tightly packed display.
 pub struct Display(BitDisplay);
 
@@ -77,6 +78,7 @@ impl Display {
     }
 
     /// Draw a sprite to the display.
+    /// Returns true if there is a collision.
     pub(crate) fn drw(&mut self, s: SpriteRecord) -> bool {
         let start_posn: usize = (s.y_start * DISPLAY_WIDTH) + s.x_start;
         let mut collision = false;
