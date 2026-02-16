@@ -51,7 +51,6 @@ pub(crate) struct SpriteRecord<'a> {
     pub(crate) data: &'a [u8],
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 /// Tightly packed display.
 pub struct Display(BitDisplay);
@@ -65,7 +64,6 @@ impl core::ops::Deref for Display {
     }
 }
 
-#[allow(dead_code)]
 impl Display {
     /// Create a new display.
     pub(crate) fn new() -> Self {
@@ -95,13 +93,14 @@ impl Display {
                     break; // clip
                 }
 
-                let mut px = self.0.get_mut(byte_posn + j).unwrap();
-                let old_px = *px;
+                if let Some(mut px) = self.0.get_mut(byte_posn + j) {
+                    let old_px = *px;
 
-                *px ^= (byte & (0x80 >> j)) != 0;
+                    *px ^= (byte & (0x80 >> j)) != 0;
 
-                if !(*px) && old_px {
-                    collision = true;
+                    if !(*px) && old_px {
+                        collision = true;
+                    }
                 }
             }
         }
@@ -114,7 +113,7 @@ impl Display {
         out.unpack(&self.0);
     }
 
-    /// Unpacks the display as a copy.
+    /// Unpacks the display into a new buffer.
     pub fn unpack_as<T: FromDisplay>(&self) -> T {
         T::from_display(&self.0)
     }
@@ -157,7 +156,7 @@ impl FrameBuffer for BoolVec {
         self.reserve(DISPLAY_AREA);
 
         for px in packed.iter().by_vals() {
-            // Safe to ignore result: capacity guaranteed.
+            // Safe to ignore result: capacity guaranteed by the type.
             #[allow(clippy::let_unit_value)]
             let _ = self.push(px);
         }
@@ -179,7 +178,7 @@ impl FrameBuffer for U8Vec {
         self.reserve(DISPLAY_AREA);
 
         for px in packed.iter().by_vals() {
-            // Safe to ignore result: capacity guaranteed.
+            // Safe to ignore result: capacity guaranteed by the type.
             #[allow(clippy::let_unit_value)]
             let _ = self.push(if px { 255 } else { 0 });
         }
@@ -201,7 +200,7 @@ impl FrameBuffer for FlatRgba {
         self.0.reserve(DISPLAY_AREA);
 
         for px in packed.iter().by_vals() {
-            // Safe to ignore result: capacity guaranteed.
+            // Safe to ignore result: capacity guaranteed by the type.
             #[allow(clippy::let_unit_value)]
             let _ = self.0.extend_from_slice(if px {
                 &[255, 255, 255, 255]
