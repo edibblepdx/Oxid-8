@@ -417,8 +417,7 @@ impl Oxid8 {
     }
 
     /// Returns a reference to the display.
-    #[must_use]
-    pub fn display_ref(&self) -> &Display {
+    pub fn display(&self) -> &Display {
         &self.display
     }
 
