@@ -255,10 +255,10 @@ impl Oxid8 {
     }
 
     /// Reset all parameters to default. Notably:
-    /// Ram is cleared and the rng uses the same seed.
+    /// Ram is cleared and the rng is reset with the same seed.
     ///
     /// Must reload font [`Oxid8::load_font`].
-    /// Must reload rom [`Oxid8::load_rom_bytes`].
+    /// Must reload ROM [`Oxid8::load_rom_bytes`].
     pub fn reset(&mut self) {
         *self = Self::new(self.seed);
     }
@@ -271,14 +271,14 @@ impl Oxid8 {
     /// CHIP-8 cpu cycles have historically ran anywhere
     /// between 500Hz to 700Hz depending on hardware and
     /// implementation. If you want finer control over
-    /// cpu speeds use call `run_cycle` yourself, and
-    /// call `dec_timers` at a rate of 16ms.
+    /// cpu speeds use call [`Oxid8::run_cycle`] yourself,
+    /// and call [`Oxid8::dec_timers`] at a rate of 16ms.
     ///
     /// # Errors
     ///
-    /// Invalid opcodes will cause `frame` to return
+    /// Invalid opcodes will return
     /// an error string with the full opcode and program
-    /// counter at that point. The rom is bad.
+    /// counter at that point. The ROM is bad.
     ///
     /// # Panics
     ///
@@ -287,7 +287,7 @@ impl Oxid8 {
     ///
     /// Other opcodes may panic if the game attempts to
     /// perform an invalid action. Otherwise the interpreter
-    /// can be left in an invalid state. The rom is bad.
+    /// can be left in an invalid state. The ROM is bad.
     pub fn next_frame(&mut self) -> Result<(), Error> {
         for _ in 0..10 {
             self.run_cycle()?;
@@ -306,7 +306,7 @@ impl Oxid8 {
     ///
     /// Invalid opcodes will cause `run_cycle` to return
     /// an error string with the full opcode and program
-    /// counter at that point. The rom is bad.
+    /// counter at that point. The ROM is bad.
     ///
     /// # Panics
     ///
@@ -315,7 +315,7 @@ impl Oxid8 {
     ///
     /// Other opcodes may panic if the game attempts to
     /// perform an invalid action. Otherwise the interpreter
-    /// can be left in an invalid state. The rom is bad.
+    /// can be left in an invalid state. The ROM is bad.
     pub fn run_cycle(&mut self) -> Result<(), Error> {
         #[rustfmt::skip]
         let opcode = Opcode::new(
@@ -388,7 +388,7 @@ impl Oxid8 {
 
     /// Decrements the delay and sound and timers.
     ///
-    /// Use `next_frame` instead if you don't want to
+    /// Use [`Oxid8::next_frame`] instead if you don't want to
     /// control cpu speed.
     pub fn dec_timers(&mut self) {
         self.dt = self.dt.max(1) - 1;
@@ -405,7 +405,7 @@ impl Oxid8 {
     ///
     /// # Panics
     ///
-    /// `set_key` panics if key is out of bounds.
+    /// Panics if key is out of bounds.
     /// Expects 0x0 - 0xF (0 - 15).
     pub fn set_key(&mut self, k: usize, val: bool) {
         self.keys[k] = val;
@@ -440,7 +440,7 @@ impl Oxid8 {
         self.load_rom_bytes(rom_data.as_slice())
     }
 
-    /// Loads a rom from byte array.
+    /// Loads a ROM from byte array.
     ///
     /// # Errors
     ///

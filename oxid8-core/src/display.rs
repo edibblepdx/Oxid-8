@@ -51,8 +51,8 @@ pub(crate) struct SpriteRecord<'a> {
     pub(crate) data: &'a [u8],
 }
 
-#[derive(Debug)]
 /// Tightly packed display.
+#[derive(Debug)]
 pub struct Display(BitDisplay);
 
 /// Provide an immutable reference to the inner [`BitDisplay`].
