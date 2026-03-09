@@ -42,7 +42,7 @@ pub const DISPLAY_HEIGHT: usize = 32;
 pub const DISPLAY_AREA: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 
 /// Type alias for a bit array.
-pub type BitDisplay = BitArr!(for DISPLAY_AREA, in u8, Msb0);
+pub type BitDisplay = BitArr!(for DISPLAY_AREA, in u8);
 
 /// Sprite data record.
 pub(crate) struct SpriteRecord<'a> {
@@ -54,6 +54,14 @@ pub(crate) struct SpriteRecord<'a> {
 /// Tightly packed display.
 #[derive(Debug)]
 pub struct Display(BitDisplay);
+
+impl core::ops::Deref for Display {
+    type Target = BitDisplay;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl Display {
     /// Create a new display.
@@ -110,8 +118,8 @@ impl Display {
     }
 
     /// Returns the display as bytes.
-    pub fn as_bytes(&self) -> &[u8] {
-        self.0.as_raw_slice()
+    pub fn as_slice(&self) -> &[u8; DISPLAY_AREA / 8] {
+        self.0.as_raw_slice().try_into().unwrap()
     }
 }
 
