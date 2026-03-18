@@ -52,7 +52,7 @@ pub(crate) struct SpriteRecord<'a> {
 }
 
 /// Tightly packed display.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Display(BitDisplay);
 
 impl core::ops::Deref for Display {

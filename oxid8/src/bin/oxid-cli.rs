@@ -314,7 +314,7 @@ fn handle_key_event(key_event: KeyEvent, state: &mut EmuState) -> Option<u8> {
 
 impl Shape for Emu {
     fn draw(&self, painter: &mut Painter) {
-        let display: BoolVec = self.core.display_ref().unpack_as();
+        let display: BoolVec = self.core.display().unpack_as();
         for y in 0..DISPLAY_HEIGHT {
             for x in 0..DISPLAY_WIDTH {
                 if display[x + y * DISPLAY_WIDTH]

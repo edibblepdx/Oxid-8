@@ -63,7 +63,7 @@ impl Widget for &mut Game {
                 .y_bounds([-height / 2.0, height / 2.0])
                 .marker(Marker::HalfBlock)
                 .paint(|ctx| {
-                    let screen_ref: Vec<bool> = self.emu.display_ref().unpack_as();
+                    let screen_ref: Vec<bool> = self.emu.display().unpack_as();
                     for y in 0..DISPLAY_HEIGHT {
                         for x in 0..DISPLAY_WIDTH {
                             if screen_ref[x + y * DISPLAY_WIDTH] {
